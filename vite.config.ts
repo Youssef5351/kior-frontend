@@ -3,12 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: './',
-  plugins: [
-    tailwindcss(),
-    react()
-  ],
+  base: './', // 👈 this makes CSS and JS use relative paths
+  plugins: [tailwindcss(), react()],
   build: {
-    outDir: 'dist'
-  }
+    outDir: 'dist',
+  },
 })
