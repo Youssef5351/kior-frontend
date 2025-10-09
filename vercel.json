@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx vite build",
+  "buildCommand": "node build.mjs",
   "outputDirectory": "dist",
   "framework": "vite"
 }
