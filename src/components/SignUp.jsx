@@ -51,7 +51,7 @@ export default function Signup() {
   // Function to complete invitation
   const completeInvitation = async (inviteToken, userToken) => {
     try {
-      await axios.post('http://localhost:5000/api/invite/complete', 
+      await axios.post('https://kior-backend.vercel.app/api/invite/complete', 
         { inviteToken },
         {
           headers: {
@@ -85,7 +85,7 @@ export default function Signup() {
 
     try {
       // Send signup request to backend
-      const response = await axios.post("http://localhost:5000/register", {
+      const response = await axios.post("https://kior-backend.vercel.app/register", {
         firstName,
         lastName,
         email,
