@@ -102,7 +102,7 @@ const Screening = ({ projectId }) => {
     const handleBeforeUnload = async (e) => {
       if (currentSessionId && id) {
         const token = localStorage.getItem('token');
-        const url = `http://localhost:5000/api/projects/${id}/screening-sessions/${currentSessionId}/end`;
+        const url = `https://kior-backend.vercel.app/api/projects/${id}/screening-sessions/${currentSessionId}/end`;
         const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
         
         if (navigator.sendBeacon) {
@@ -132,7 +132,7 @@ const Screening = ({ projectId }) => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/projects/${id}/screening-sessions/start`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-sessions/start`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -156,7 +156,7 @@ const Screening = ({ projectId }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:5000/api/projects/${id}/screening-sessions/${currentSessionId}/end`, 
+        `https://kior-backend.vercel.app/api/projects/${id}/screening-sessions/${currentSessionId}/end`, 
         {
           method: 'POST',
           headers: {
@@ -272,7 +272,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
       const token = localStorage.getItem('token');
       if (!token || !currentUser) return;
 
-      const articlesResponse = await fetch(`http://localhost:5000/api/projects/${id}/articles`, {
+      const articlesResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/articles`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -284,7 +284,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
         
         setArticles(nonDuplicateArticles);
         
-        const screeningResponse = await fetch(`http://localhost:5000/api/projects/${id}/screening-data`, {
+        const screeningResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-data`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -328,7 +328,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     if (!currentUser || !id) return;
 
     const token = localStorage.getItem('token');
-    const wsUrl = `ws://localhost:5000/?projectId=${id}&userId=${currentUser.id}&token=${token}`;
+    const wsUrl = `ws://kior-backend.vercel.app/?projectId=${id}&userId=${currentUser.id}&token=${token}`;
     
     if (wsRef.current) {
       wsRef.current.close();
@@ -429,7 +429,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/projects/${id}/blind-mode`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/blind-mode`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -481,7 +481,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
           window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        const userResponse = await fetch('http://localhost:5000/api/user', {
+        const userResponse = await fetch('https://kior-backend.vercel.app/api/user', {
           headers: {
             'Authorization': `Bearer ${token}`,
           }
@@ -498,7 +498,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
         setCurrentUser(userData);
 
         try {
-          const accessResponse = await fetch(`http://localhost:5000/api/projects/${id}/check-access`, {
+          const accessResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/check-access`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             }
@@ -510,7 +510,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
             return;
           }
 
-          const projectResponse = await fetch(`http://localhost:5000/api/projects/${id}`, {
+          const projectResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             }
@@ -547,7 +547,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
   };
   const loadProjectData = async (token, userData) => {
     try {
-      const articlesResponse = await fetch(`http://localhost:5000/api/projects/${id}/articles`, {
+      const articlesResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/articles`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -563,7 +563,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
       setArticles(nonDuplicateArticles);
 
       try {
-        const screeningResponse = await fetch(`http://localhost:5000/api/projects/${id}/screening-data`, {
+        const screeningResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-data`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -622,7 +622,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/projects/${id}/screening-decisions`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-decisions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -693,7 +693,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
       const token = localStorage.getItem('token');
       if (!token || !currentUser) return;
 
-      const screeningResponse = await fetch(`http://localhost:5000/api/projects/${id}/screening-data`, {
+      const screeningResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-data`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
