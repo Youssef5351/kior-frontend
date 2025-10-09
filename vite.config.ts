@@ -3,9 +3,7 @@ import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: '/', // ✅ use root path for Vercel
+  base: './', // 👈 keeps asset paths relative
   plugins: [tailwindcss(), react()],
-  build: {
-    outDir: 'dist',
-  },
+  build: { outDir: 'dist' },
 })
