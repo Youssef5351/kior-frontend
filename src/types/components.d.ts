@@ -1,0 +1,14 @@
+declare module './components/HeroPage';
+declare module './components/AppFeatures';
+declare module './components/SignUp';
+declare module './components/Dashboard';
+declare module './components/ProjectOverview';
+declare module './components/ScreeningPage';
+declare module './components/Login';
+declare module './components/DuplicateDetection';
+declare module './components/WhyUs';
+declare module './components/Ending';
+declare module './components/ProtectedRoute';
+declare module './components/Footer';
+declare module './components/TeamStatistics';
+declare module './components/Full-text';
