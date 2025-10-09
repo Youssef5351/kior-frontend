@@ -193,7 +193,7 @@ export default function ProjectOverview() {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/invite`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/invite`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -271,7 +271,7 @@ export default function ProjectOverview() {
       
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`http://localhost:5000/api/projects/${id}`, {
+      const res = await fetch(`https://kior-backend.vercel.app/api/projects/${id}`, {
         headers: {
           "Authorization": `Bearer ${token}`,
         },
@@ -292,7 +292,7 @@ export default function ProjectOverview() {
       setProject(data);
 
       // Fetch analysis data
-      const analysisRes = await fetch(`http://localhost:5000/api/projects/${id}/analysis`, {
+      const analysisRes = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/analysis`, {
         headers: {
           "Authorization": `Bearer ${token}`,
         },
@@ -323,7 +323,7 @@ export default function ProjectOverview() {
     const fetchCurrentUser = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("http://localhost:5000/api/user", {
+        const response = await fetch("https://kior-backend.vercel.app/api/user", {
           headers: {
             "Authorization": `Bearer ${token}`,
           },
@@ -370,7 +370,7 @@ export default function ProjectOverview() {
     setDetecting(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/duplicates/projects/${projectId}/detect`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/detect`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -434,7 +434,7 @@ export default function ProjectOverview() {
   const fetchResolutionSummary = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/projects/${id}/resolution-summary`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/resolution-summary`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -481,7 +481,7 @@ export default function ProjectOverview() {
       // Show loading state
       setDetecting(true);
       
-      const response = await fetch(`http://localhost:5000/api/duplicates/projects/${projectId}/resolve-all`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolve-all`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -554,7 +554,7 @@ export default function ProjectOverview() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/duplicates/projects/${projectId}`, {
+      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
