@@ -1,19 +1,21 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import HeroPage from "./components/HeroPage.jsx";
-import AppFeatures from "./components/AppFeatures.jsx";
-import SignUp from "./components/SignUp.jsx";
-import Dashboard from "./components/Dashboard.jsx";
-import ProjectOverview from "./components/ProjectOverview.jsx";
-import ScreeningPage from "./components/ScreeningPage.jsx";
-import Login from "./components/Login.jsx";
-import DuplicateDetection from "./components/DuplicateDetection.jsx";
-import WhyUs from "./components/WhyUs.jsx";
-import Ending from "./components/Ending.jsx";
-import ProtectedRoute from './components/ProtectedRoute.jsx';
-import Footer from "./components/Footer.jsx";
-import TeamStatistics from './components/TeamStatistics.jsx';
-import Fulltext from './components/Full-text.jsx';
+import HeroPage from "./components/HeroPage";
+import AppFeatures from "./components/AppFeatures";
+import SignUp from "./components/SignUp";
+import Dashboard from "./components/Dashboard";
+import ProjectOverview from "./components/ProjectOverview";
+import ScreeningPage from "./components/ScreeningPage";
+import Login from "./components/Login";
+import DuplicateDetection from "./components/DuplicateDetection";
+import WhyUs from "./components/WhyUs";
+import Ending from "./components/Ending";
+import ProtectedRoute from './components/ProtectedRoute';
+import Footer from "./components/Footer";
+import TeamStatistics from './components/TeamStatistics';
+import Fulltext from './components/Full-text';
+import { useParams } from "react-router-dom";
 function App() {
+  const { id } = useParams();
   return (
     <Router>
       <Routes>
@@ -52,7 +54,7 @@ function App() {
       path="/projects/:id/screening" 
       element={
         <ProtectedRoute>
-          <ScreeningPage />
+          <ScreeningPage  projectId={id} />
         </ProtectedRoute>
       } 
     />
