@@ -1,5 +1,8 @@
 {
   "buildCommand": "node build.mjs",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ]
 }
