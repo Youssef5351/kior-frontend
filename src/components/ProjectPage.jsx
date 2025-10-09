@@ -25,7 +25,7 @@ export default function ProjectPage() {
     const fetchProject = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`http://localhost:5000/api/projects/${id}`, {
+        const res = await fetch(`https://kior-backend.vercel.app/api/projects/${id}`, {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
