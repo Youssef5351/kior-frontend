@@ -328,7 +328,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     if (!currentUser || !id) return;
 
     const token = localStorage.getItem('token');
-    const wsUrl = `ws://kior-backend.vercel.app/?projectId=${id}&userId=${currentUser.id}&token=${token}`;
+    const wsUrl = `ws://localhost:5000/?projectId=${id}&userId=${currentUser.id}&token=${token}`;
     
     if (wsRef.current) {
       wsRef.current.close();
@@ -545,64 +545,77 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
   const isOwner = () => {
     return currentUser && projectOwnerId && currentUser.id === projectOwnerId;
   };
-  const loadProjectData = async (token, userData) => {
+const loadProjectData = async (token, userData) => {
+  try {
+    const articlesResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/articles`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!articlesResponse.ok) {
+      throw new Error('Failed to load articles');
+    }
+
+    const articlesData = await articlesResponse.json();
+    const nonDuplicateArticles = articlesData.filter(article => 
+      article.duplicateStatus !== 'duplicate'
+    );
+    
+    setArticles(nonDuplicateArticles);
+
     try {
-      const articlesResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/articles`, {
+      const screeningResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-data`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!articlesResponse.ok) {
-        throw new Error('Failed to load articles');
-      }
-
-      const articlesData = await articlesResponse.json();
-      const nonDuplicateArticles = articlesData.filter(article => 
-        article.duplicateStatus !== 'duplicate'
-      );
-      
-      setArticles(nonDuplicateArticles);
-
-      try {
-        const screeningResponse = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-data`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (screeningResponse.ok) {
-          const screeningData = await screeningResponse.json();
-          setCollaborativeData(screeningData);
-          
-          const userDecisions = {};
-          const userNotes = {};
-          
-          screeningData.decisions?.forEach(decision => {
+      if (screeningResponse.ok) {
+        const screeningData = await screeningResponse.json();
+        console.log('📊 Screening data from API:', screeningData); // DEBUG LOG
+        
+        setCollaborativeData(screeningData);
+        
+        const userDecisions = {};
+        const userNotes = {};
+        
+        // Check if we actually got decisions from API
+        if (screeningData.decisions && screeningData.decisions.length > 0) {
+          screeningData.decisions.forEach(decision => {
             if (decision.userId === userData.id) {
               userDecisions[decision.articleId] = decision.status;
             }
           });
-          
-          screeningData.notes?.forEach(note => {
+        } else {
+          console.log('⚠️ No decisions found in API response'); // DEBUG LOG
+        }
+        
+        // Check if we actually got notes from API
+        if (screeningData.notes && screeningData.notes.length > 0) {
+          screeningData.notes.forEach(note => {
             if (note.userId === userData.id) {
               userNotes[note.articleId] = note.notes;
             }
           });
-          
-          setDecisions(userDecisions);
-          setNotes(userNotes);
-        } else {
-          loadLocalStorageData();
         }
-      } catch (error) {
-        console.error('Error loading screening data:', error);
+        
+        setDecisions(userDecisions);
+        setNotes(userNotes);
+        
+        // Also load from localStorage as backup
+        loadLocalStorageData();
+      } else {
+        console.log('⚠️ Screening API failed, loading from localStorage');
         loadLocalStorageData();
       }
-
-      setLoading(false);
     } catch (error) {
-      console.error('Error loading project data:', error);
-      setLoading(false);
+      console.error('Error loading screening data:', error);
+      loadLocalStorageData();
     }
-  };
 
+    setLoading(false);
+  } catch (error) {
+    console.error('Error loading project data:', error);
+    setLoading(false);
+  }
+};
   useEffect(() => {
     if (currentUser && id && !loading) {
       connectWebSocket();
@@ -620,7 +633,8 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
 
   const saveScreeningData = async (articleId, status, noteText) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
       
       const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/screening-decisions`, {
         method: 'POST',
