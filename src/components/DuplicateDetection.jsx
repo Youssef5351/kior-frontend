@@ -127,9 +127,6 @@ const DuplicateGroupCard = ({ group, viewMode, onCompare }) => {
         <div className={`px-2 py-1 rounded-md text-xs font-semibold border ${getSimilarityColor(group.similarArticles[0]?.scores.title || 0)}`}>
           📝 Title: {Math.round((group.similarArticles[0]?.scores.title || 0) * 100)}%
         </div>
-        <div className={`px-2 py-1 rounded-md text-xs font-semibold border ${getSimilarityColor(group.similarArticles[0]?.scores.authors || 0)}`}>
-          👥 Authors: {Math.round((group.similarArticles[0]?.scores.authors || 0) * 100)}%
-        </div>
         {group.similarArticles[0]?.scores.doi === 1 && (
           <div className="px-2 py-1 rounded-md text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
             🔗 DOI: 100%
