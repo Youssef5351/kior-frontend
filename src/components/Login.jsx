@@ -117,20 +117,6 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Already logged in message */}
-        {localStorage.getItem('token') && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-            <p className="text-yellow-700 text-sm">
-              <strong>You're already logged in.</strong> You can sign in with a different account below.
-            </p>
-            <button
-              onClick={handleContinueToDashboard}
-              className="mt-2 cursor-pointer text-purple-600 hover:text-purple-500 text-sm font-medium"
-            >
-              Continue to Dashboard →
-            </button>
-          </div>
-        )}
 
         {/* Login Form */}
         <form 
