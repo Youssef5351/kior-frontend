@@ -64,10 +64,10 @@ export default function ProjectOverview() {
     const saved = localStorage.getItem(`articlesBeforeDuplicates_${id}`);
     return saved ? parseInt(saved) : 0;
   });
-  const [articlesAfterDuplicates, setArticlesAfterDuplicates] = useState(() => {
-    const saved = localStorage.getItem(`articlesAfterDuplicates_${id}`);
-    return saved ? parseInt(saved) : 0;
-  });
+const [articlesAfterDuplicates, setArticlesAfterDuplicates] = useState(() => {
+  const saved = localStorage.getItem(`articlesAfterDuplicates_${id}`);
+  return saved ? parseInt(saved) : articlesBeforeDuplicates; // Default to before count if not saved
+});
   const [duplicateGroupsFound, setDuplicateGroupsFound] = useState(() => {
     const saved = localStorage.getItem(`duplicateGroupsFound_${id}`);
     return saved ? parseInt(saved) : 0;
@@ -263,62 +263,56 @@ export default function ProjectOverview() {
     setFormData({ emails: '', role: '', message: '' });
   };
 
-  // Function to refresh project data
-  const fetchProjectData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem("token");
+const fetchProjectData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    const token = localStorage.getItem("token");
 
-      const res = await fetch(`https://kior-backend.vercel.app/api/projects/${id}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-      
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError("Project not found");
-        } else if (res.status === 403) {
-          setError("Access denied to project");
-        } else {
-          setError("Failed to load project");
-        }
-        return;
-      }
-      
-      const data = await res.json();
-      setProject(data);
+    console.log("🔄 Fetching project data...");
 
-      // Fetch analysis data
-      const analysisRes = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/analysis`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
-      });
+    // Fetch project and analysis in parallel for better performance
+    const [projectRes, analysisRes] = await Promise.all([
+      fetch(`https://kior-backend.vercel.app/api/projects/${id}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      }),
+      fetch(`https://kior-backend.vercel.app/api/projects/${id}/analysis`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      })
+    ]);
 
-      if (analysisRes.ok) {
-        const analysisData = await analysisRes.json();
-        setAnalysis(analysisData);
-        
-        // Set initial articles count - only if not already set from localStorage
-        const totalArticles = analysisData.totalArticles || 0;
-        if (articlesBeforeDuplicates === 0) {
-          setArticlesBeforeDuplicates(totalArticles);
-        }
-        if (articlesAfterDuplicates === 0) {
-          setArticlesAfterDuplicates(totalArticles);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching project:", err);
-      setError("Network error loading project");
-    } finally {
-      setLoading(false);
+    if (!projectRes.ok) throw new Error(`Project fetch failed: ${projectRes.status}`);
+    if (!analysisRes.ok) throw new Error(`Analysis fetch failed: ${analysisRes.status}`);
+
+    const projectData = await projectRes.json();
+    const analysisData = await analysisRes.json();
+
+    setProject(projectData);
+    setAnalysis(analysisData);
+    
+    console.log("📊 Analysis data:", analysisData);
+
+    const totalArticles = analysisData.totalArticles || 0;
+    
+    // Always update articlesBeforeDuplicates with the actual total
+    setArticlesBeforeDuplicates(totalArticles);
+    
+    // Only update articlesAfterDuplicates if we don't have a valid count from duplicate detection
+    // OR if no duplicates were detected
+    if (!duplicatesDetected || articlesAfterDuplicates === 0) {
+      setArticlesAfterDuplicates(totalArticles);
     }
-  };
 
+    console.log("✅ Final counts - Before:", totalArticles, "After:", articlesAfterDuplicates);
+    
+  } catch (err) {
+    console.error("❌ Error fetching project:", err);
+    setError("Error loading project or analysis");
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -378,39 +372,44 @@ export default function ProjectOverview() {
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setDuplicates(data.duplicates || []);
-        
-        // Update duplicate detection state
-        setDuplicatesDetected(true);
-        setDuplicateGroupsFound(data.summary?.totalGroups || 0);
-        setTotalDuplicateArticles(data.summary?.totalArticles || 0);
-        
-        // Calculate articles after duplicates
-        const remainingArticles = articlesBeforeDuplicates - (data.summary?.totalArticles || 0);
-        setArticlesAfterDuplicates(remainingArticles > 0 ? remainingArticles : 0);
-        
-        // Update analysis state
-        setAnalysis(prev => ({
-          ...prev,
-          totalDuplicates: data.summary?.totalArticles || 0,
-          unresolved: data.summary?.totalGroups || 0
-        }));
+if (response.ok) {
+  const data = await response.json();
+  setDuplicates(data.duplicates || []);
+  
+  // Update duplicate detection state
+  setDuplicatesDetected(true);
+  setDuplicateGroupsFound(data.summary?.totalGroups || 0);
+  setTotalDuplicateArticles(data.summary?.totalArticles || 0);
+  
+  // Calculate articles after duplicates
+// This subtracts only the duplicates that will be removed
+const totalArticlesBefore = articlesBeforeDuplicates; // 655
+const totalGroups = data.summary?.totalGroups || 0; // 3
+const totalArticlesInDuplicateGroups = data.summary?.totalArticles || 0; // This might be 9, not 6!
 
-        swal({
-          icon: 'success',
-          title: 'Duplicates Detected!',
-          html: `
-            <div class="text-left">
-              <p>🎉 Found <strong>${data.summary?.totalGroups}</strong> duplicate groups with <strong>${data.summary?.totalArticles}</strong> articles</p>
-              <p class="mt-2">📊 Articles before duplicates: <strong>${articlesBeforeDuplicates}</strong></p>
-              <p>📊 Articles after duplicates: <strong>${remainingArticles}</strong></p>
-            </div>
-          `,
-          confirmButtonColor: '#3085d6',
-        });
-      } else {
+// If each group has multiple duplicates, the calculation is:
+const articlesToRemove = totalArticlesInDuplicateGroups - totalGroups;
+const remainingArticles = totalArticlesBefore - articlesToRemove;
+
+console.log(`📊 Calculation: ${totalArticlesBefore} - (${totalArticlesInDuplicateGroups} - ${totalGroups}) = ${remainingArticles}`);
+
+setArticlesAfterDuplicates(remainingArticles);
+  // Refresh the analysis data to get updated counts from backend
+  await fetchProjectData();
+  
+  swal({
+    icon: 'success',
+    title: 'Duplicates Detected!',
+    html: `
+      <div class="text-left">
+        <p>🎉 Found <strong>${data.summary?.totalGroups}</strong> duplicate groups with <strong>${data.summary?.totalArticles}</strong> articles</p>
+        <p class="mt-2">📊 Articles before duplicates: <strong>${articlesBeforeDuplicates}</strong></p>
+        <p>📊 Articles after duplicates: <strong>${remainingArticles}</strong></p>
+      </div>
+    `,
+    confirmButtonColor: '#3085d6',
+  });
+} else {
         swal({
           icon: 'error',
           title: 'Detection Failed',
@@ -457,96 +456,80 @@ export default function ProjectOverview() {
     }
   }, [projectId]);
 
-  const resolveAllDuplicates = async () => {
-    if (!projectId) return;
+const resolveAllDuplicates = async () => {
+  if (!projectId) return;
 
-    const result = await swal({
-      title: 'Resolve All Duplicates?',
-      text: 'This will automatically detect and resolve all duplicate groups by keeping the highest quality articles and removing duplicates.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, resolve them!',
-      cancelButtonText: 'Cancel'
+  const confirmed = await swal({
+    title: 'Resolve All Duplicates?',
+    text: 'This will automatically detect and resolve all duplicate groups by keeping the highest quality articles and removing duplicates.',
+    icon: 'warning',
+    buttons: ['Cancel', 'Yes, resolve them!'],
+    dangerMode: true,
+  });
+
+  if (!confirmed) return;
+
+  try {
+    const token = localStorage.getItem('token');
+    setDetecting(true);
+
+    const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolve-all`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
 
-    if (!result.isConfirmed) {
-      return;
-    }
+    if (response.ok) {
+      const data = await response.json();
 
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Show loading state
-      setDetecting(true);
-      
-      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolve-all`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      setDuplicates([]);
+      setDuplicatesDetected(false);
+
+      await swal({
+        icon: 'success',
+        title: 'Success!',
+        text: `✅ Resolved ${data.data.summary.duplicateGroupsFound} duplicate groups.
+
+Removed ${data.data.statistics.duplicatesRemoved} duplicates.
+Final article count: ${data.data.statistics.finalArticles}.
+Reduction: ${data.data.statistics.reduction}.
+
+Redirecting to screening page...`,
+        buttons: false,
+        timer: 2500,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Clear duplicates state since they're resolved
-        setDuplicates([]);
-        setDuplicatesDetected(false);
-        
-        swal({
-          icon: 'success',
-          title: 'Success!',
-          html: `
-            <div class="text-left">
-              <p>✅ Success! Resolved <strong>${data.data.summary.duplicateGroupsFound}</strong> duplicate groups.</p>
-              <p class="mt-2">📊 Results:</p>
-              <ul class="list-disc list-inside">
-                <li>Removed <strong>${data.data.statistics.duplicatesRemoved}</strong> duplicates</li>
-                <li>Final article count: <strong>${data.data.statistics.finalArticles}</strong></li>
-                <li>Reduction: <strong>${data.data.statistics.reduction}</strong></li>
-              </ul>
-              <p class="mt-2">Redirecting to screening page...</p>
-            </div>
-          `,
-          confirmButtonColor: '#3085d6',
-        });
-        
-        // Update articles count
-        setArticlesAfterDuplicates(data.data.statistics.finalArticles);
-        
-        // Refresh the summary
-        await fetchResolutionSummary();
-        
-        // Automatically redirect to screening page after a brief delay
-        setTimeout(() => {
-          console.log('🚀 Redirecting to screening page...');
-          navigate(`/projects/${projectId}/screening`);
-        }, 2000);
-        
-      } else {
-        const errorData = await response.json();
-        swal({
-          icon: 'error',
-          title: 'Failed',
-          text: `Failed to resolve all duplicates: ${errorData.error}`,
-          confirmButtonColor: '#d33',
-        });
-        setDetecting(false);
-      }
-    } catch (error) {
-      console.error('Error resolving all duplicates:', error);
+      setArticlesAfterDuplicates(data.data.statistics.finalArticles);
+      await fetchResolutionSummary();
+    await fetchProjectData(); // Refresh to get updated counts
+
+      setTimeout(() => {
+        console.log('🚀 Redirecting to screening page...');
+        navigate(`/projects/${projectId}/screening`);
+      }, 2500);
+    } else {
+      const errorData = await response.json();
       swal({
         icon: 'error',
-        title: 'Error',
-        text: 'Error resolving all duplicates',
-        confirmButtonColor: '#d33',
+        title: 'Failed',
+        text: `Failed to resolve all duplicates: ${errorData.error}`,
+        button: 'OK',
       });
       setDetecting(false);
     }
-  };
+  } catch (error) {
+    console.error('Error resolving all duplicates:', error);
+    swal({
+      icon: 'error',
+      title: 'Error',
+      text: 'Error resolving all duplicates',
+      button: 'OK',
+    });
+    setDetecting(false);
+  }
+};
 
   const fetchDuplicates = async () => {
     if (!projectId) return;
@@ -576,6 +559,48 @@ export default function ProjectOverview() {
       setLoading(false);
     }
   };
+
+  const testImport = async () => {
+  // You'll need to get your .nbib file content here
+  const nbibContent = `...paste your .nbib content here...`;
+  
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/debug-import`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content: nbibContent })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log("🔍 Import Debug Results:", data);
+      swal({
+        icon: 'info',
+        title: 'Import Debug Results',
+        html: `
+          <div class="text-left text-sm">
+            <p><strong>Parsed Articles:</strong> ${data.parsedCount}</p>
+            <p><strong>With Titles:</strong> ${data.withTitles}</p>
+            <p><strong>With Authors:</strong> ${data.withAuthors}</p>
+            <p><strong>Sample Import Results:</strong></p>
+            <ul class="mt-2">
+              ${data.sampleImport.map(result => 
+                `<li>${result.success ? '✅' : '❌'} ${result.title || 'No title'}</li>`
+              ).join('')}
+            </ul>
+          </div>
+        `,
+        confirmButtonColor: '#3085d6',
+      });
+    }
+  } catch (error) {
+    console.error('Debug import error:', error);
+  }
+};
 
   const getUserRole = () => {
     if (!currentUser || !project) return "Guest";
@@ -630,18 +655,11 @@ export default function ProjectOverview() {
                 </div>
                 <div className="space-y-2">
                   <div>
-                    <div className="text-lg font-bold text-gray-900">{articlesBeforeDuplicates}</div>
-                    <p className="text-xs text-gray-500">Number of articles before duplicates</p>
+                    <div className="text-xl font-bold text-gray-900">{articlesBeforeDuplicates}</div>
+                    <p className="text-[15px] text-gray-500">Total Articles</p>
                   </div>
-                  {duplicatesDetected && (
-                    <div>
-                      <div className="text-lg font-bold text-green-600">{articlesAfterDuplicates}</div>
-                      <p className="text-xs text-gray-500">Number of articles after duplicates</p>
-                    </div>
-                  )}
                 </div>
               </div>
-
               {/* Quality Control Box - Updated */}
               <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all duration-300">
                 <div className="flex items-center justify-between mb-4">
@@ -1080,10 +1098,6 @@ export default function ProjectOverview() {
                 
               </button>
               </a>
-              {/* <button className="px-3 cursor-pointer py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all flex items-center gap-2 text-gray-700 text-sm">
-                <Sparkles className="w-4 h-4" />
-                Shortcuts
-              </button> */}
               {isOwner && (
                 <button 
                   onClick={() => setShowInviteModal(true)}
