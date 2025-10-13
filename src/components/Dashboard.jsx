@@ -11,6 +11,9 @@ const Dashboard = () => {
   const [filter, setFilter] = useState('all');
   const [user, setUser] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+const [uploading, setUploading] = useState(false);
+
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
   const handleUploadSuccess = (projectId) => {
@@ -103,16 +106,21 @@ const handleFileUpload = (e) => {
   const newFiles = Array.from(e.target.files);
 
   setFormData((prev) => {
-    // filter out duplicates by file name
     const existingNames = prev.files.map((f) => f.name);
     const filtered = newFiles.filter((file) => !existingNames.includes(file.name));
-
-    return {
-      ...prev,
-      files: [...prev.files, ...filtered],
-    };
+    return { ...prev, files: [...prev.files, ...filtered] };
   });
+
+  // 👇 Reset file input so user can re-upload same file after deletion
+  e.target.value = null;
 };
+const handleDeleteFile = (fileName) => {
+  setFormData((prev) => ({
+    ...prev,
+    files: prev.files.filter((f) => f.name !== fileName),
+  }));
+};
+
 
 
   const handleFormChange = (field, value) => {
@@ -227,10 +235,14 @@ const handleCreateReview = async () => {
 
   try {
     setProjectCreating(true);
+        setUploading(true);
+    setUploadProgress(0);
     const token = localStorage.getItem("token");
 
     const formDataToSend = new FormData();
     formData.files.forEach(file => formDataToSend.append("files", file));
+
+    
 
     const response = await fetch(`https://kior-backend.vercel.app/api/projects/${currentProjectId}/upload`, {
       method: "POST",
@@ -799,24 +811,37 @@ const handleProjectClick = (projectId) => {
                     <p className="text-sm text-blue-400">No files uploaded.</p>
                   ) : (
                     formData.files.map((file, i) => (
-                      <div key={i} className="flex justify-between items-center border border-blue-200 rounded px-3 py-2 text-sm bg-white">
-                        <span className="text-blue-800">{file.name}</span>
-                        <button
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              files: prev.files.filter((_, idx) => idx !== i),
-                            }))
-                          }
-                          className="text-blue-400 hover:text-red-500 transition cursor-pointer"
-                        >
-                          🗑
-                        </button>
-                      </div>
+  <div className="mt-4 space-y-2">
+    {formData.files.map((file) => (
+      <div
+        key={file.name}
+        className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2 bg-gray-50"
+      >
+        <span className="text-sm text-gray-700 truncate">{file.name}</span>
+        <button
+          onClick={() => handleDeleteFile(file.name)}
+          className="text-red-500 hover:text-red-600 text-sm"
+        >
+          Delete
+        </button>
+      </div>
+    ))}
+  </div>
                     ))
                   )}
                 </div>
+  {uploading && (
+    <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
+      <div
+        className="bg-blue-600 h-3 rounded-full transition-all duration-200"
+        style={{ width: `${uploadProgress}%` }}
+      />
+    </div>
+  )}
 
+  {uploading && (
+    <p className="text-xs text-blue-700 mt-2">{uploadProgress}% uploaded</p>
+  )}
               </div>
             </div>
           </div>
