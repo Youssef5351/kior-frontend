@@ -430,29 +430,29 @@ setArticlesAfterDuplicates(remainingArticles);
     }
   };
 
-  const fetchResolutionSummary = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/resolution-summary`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+  // const fetchResolutionSummary = async () => {
+  //   try {
+  //     const token = localStorage.getItem('token');
+  //     const response = await fetch(`https://kior-backend.vercel.app/api/projects/${id}/resolution-summary`, {
+  //       headers: {
+  //         'Authorization': `Bearer ${token}`,
+  //       },
+  //     });
       
-      if (response.ok) {
-        const data = await response.json();
-        setResolutionSummary(data);
-      }
-    } catch (error) {
-      console.error('Error fetching resolution summary:', error);
-    }
-  };
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       setResolutionSummary(data);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching resolution summary:', error);
+  //   }
+  // };
   
   // Call this in your useEffect
   useEffect(() => {
     if (projectId) {
       fetchDuplicates();
-      fetchResolutionSummary();
+      // fetchResolutionSummary();
     }
   }, [projectId]);
 
