@@ -1,11 +1,21 @@
-import { execSync } from "node:child_process";
+// build.mjs
+import { build } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import tailwindcss from '@tailwindcss/vite';
 
-console.log("Running Vite build safely...");
-try {
-  execSync("npm install vite --no-save", { stdio: "inherit" });
-  execSync("node ./node_modules/vite/bin/vite.js build", { stdio: "inherit" });
-  console.log("✅ Vite build completed successfully!");
-} catch (err) {
-  console.error("❌ Build failed:", err);
-  process.exit(1);
+async function runBuild() {
+  try {
+    await build({
+      plugins: [tailwindcss(), react()],
+      build: {
+        outDir: 'dist',
+      },
+    });
+    console.log('Build completed successfully');
+  } catch (error) {
+    console.error('Build failed:', error);
+    process.exit(1);
+  }
 }
+
+runBuild();
