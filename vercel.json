@@ -4,5 +4,8 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "env": {
+    "SKIP_ENV_VALIDATION": "1"
+  }
 }
