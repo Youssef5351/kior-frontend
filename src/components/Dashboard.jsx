@@ -54,7 +54,7 @@ useEffect(() => {
       }
  console.log('📡 Making request to /api/user with Authorization header');
       // Fetch user data
-      const userResponse = await fetch('https://kior-backend.vercel.app/api/user', {
+      const userResponse = await fetch('https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/user', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -67,7 +67,7 @@ useEffect(() => {
       }
 
       // Fetch user's projects
-      const projectsResponse = await fetch('https://kior-backend.vercel.app/api/projects', {
+      const projectsResponse = await fetch('https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -171,7 +171,7 @@ const handleCreateReview = async () => {
         return;
       }
 
-      const response = await fetch('https://kior-backend.vercel.app/api/projects', {
+      const response = await fetch('https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -244,7 +244,7 @@ const handleCreateReview = async () => {
 
     
 
-    const response = await fetch(`https://kior-backend.vercel.app/api/projects/${currentProjectId}/upload`, {
+    const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${currentProjectId}/upload`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`
@@ -356,7 +356,7 @@ const handleInviteSubmit = async () => {
     setInviteLoading(true);
 
     const token = localStorage.getItem('token');
-    const res = await fetch("https://kior-backend.vercel.app/api/invite", {
+    const res = await fetch("https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/invite", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -406,7 +406,7 @@ const handleUpload = async (projectId, files) => {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
 
-  const res = await fetch(`https://kior-backend.vercel.app/api/projects/${projectId}/upload`, {
+  const res = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/upload`, {
     method: "POST",
     body: formData,
   });
