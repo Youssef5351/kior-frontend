@@ -51,7 +51,7 @@ export default function Signup() {
   // Function to complete invitation
   const completeInvitation = async (inviteToken, userToken) => {
     try {
-      await axios.post('https://kior-backend.vercel.app/api/invite/complete', 
+      await axios.post('https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/invite/complete', 
         { inviteToken },
         {
           headers: {
@@ -85,7 +85,7 @@ export default function Signup() {
 
     try {
       // Send signup request to backend
-      const response = await axios.post("https://kior-backend.vercel.app/register", {
+      const response = await axios.post("https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/register", {
         firstName,
         lastName,
         email,
