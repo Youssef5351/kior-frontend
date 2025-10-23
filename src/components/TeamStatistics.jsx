@@ -34,7 +34,7 @@ const TeamStatistics = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${projectId}/team-stats?range=${timeRange}`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/team-stats?range=${timeRange}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
