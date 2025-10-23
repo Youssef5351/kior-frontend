@@ -8,7 +8,7 @@ export const useScreeningSession = (projectId) => {
   const startSession = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/projects/${projectId}/screening-sessions/start`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/screening-sessions/start`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -32,7 +32,7 @@ export const useScreeningSession = (projectId) => {
 
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/projects/${projectId}/screening-sessions/${sessionId}/end`, {
+      await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/screening-sessions/${sessionId}/end`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -77,7 +77,7 @@ export const useScreeningSession = (projectId) => {
       if (isActive) {
         // Use synchronous request or sendBeacon for better reliability
         navigator.sendBeacon(
-          `http://localhost:5000/api/projects/${projectId}/screening-sessions/${sessionId}/end`
+          `https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/screening-sessions/${sessionId}/end`
         );
       }
     };
