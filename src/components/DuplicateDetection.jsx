@@ -408,7 +408,7 @@ const handleResolveAll = async () => {
   setResolvingAll(true);
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolve-all`, {
+    const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/resolve-all`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -653,7 +653,7 @@ const DuplicateDetection = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolution-summary`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/resolution-summary`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -684,7 +684,7 @@ const DuplicateDetection = () => {
       const token = localStorage.getItem('token');
       setDetecting(true);
       
-      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolve-all`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/resolve-all`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -721,7 +721,7 @@ const DuplicateDetection = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -749,7 +749,7 @@ const DuplicateDetection = () => {
     setDetecting(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/detect`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/detect`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -775,7 +775,7 @@ const DuplicateDetection = () => {
   const resolveDuplicates = async (articleIds, resolution) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/duplicates/projects/${projectId}/resolve`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/resolve`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
