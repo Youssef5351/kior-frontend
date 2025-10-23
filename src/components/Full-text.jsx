@@ -43,7 +43,7 @@ const FullTextReview = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${projectId}/fulltext-articles`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/fulltext-articles`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -100,7 +100,7 @@ const FullTextReview = () => {
 
       console.log('Uploading file:', file.name, 'for article:', articleId);
 
-      const response = await fetch(`https://kior-backend.vercel.app/api/projects/${projectId}/upload-fulltext`, {
+      const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/upload-fulltext`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -154,7 +154,7 @@ const downloadFile = (articleId, filename) => {
   }
   
   // Add token to the URL as a query parameter
-  const downloadUrl = `https://kior-backend.vercel.app/api/projects/${projectId}/download-fulltext/${articleId}?token=${encodeURIComponent(token)}`;
+  const downloadUrl = `https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${projectId}/download-fulltext/${articleId}?token=${encodeURIComponent(token)}`;
   
   console.log('Creating direct download link with token');
   
