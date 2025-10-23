@@ -66,7 +66,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch('https://kior-backend.vercel.app/api/auth/login', {
+      const response = await fetch('https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
