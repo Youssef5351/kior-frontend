@@ -473,7 +473,7 @@ const resolveAllDuplicates = async () => {
     const token = localStorage.getItem('token');
     setDetecting(true);
 
-    const response = await fetch(https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/resolve-all`, {
+    const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/duplicates/projects/${projectId}/resolve-all`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
