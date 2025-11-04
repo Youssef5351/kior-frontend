@@ -328,8 +328,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     if (!currentUser || !id) return;
 
     const token = localStorage.getItem('token');
-    const wsUrl = `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/?projectId=${id}&userId=${currentUser.id}&token=${token}`;
-    
+    const wsUrl = `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/ws?projectId=${id}&userId=${currentUser.id}&token=${token}`;
     if (wsRef.current) {
       wsRef.current.close();
     }
