@@ -324,124 +324,74 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     };
   }, [id, currentUser]);
 
- const connectWebSocket = () => {
-  if (!currentUser || !id) return;
+const connectWebSocket = () => {
+  console.log('🔌 WebSocket not available, using polling instead');
+  // Don't actually connect to WebSocket
+  wsRef.current = { readyState: 3 }; // CLOSED state
+  
+  // Start polling for updates every 5 seconds
+  if (!reconnectTimeoutRef.current) {
+    reconnectTimeoutRef.current = setInterval(() => {
+      refreshScreeningData();
+    }, 5000);
+  }
+};
 
-  const token = localStorage.getItem('token');
-  if (!token) {
-    console.warn('No token available for WebSocket connection');
+// Update your cleanup to clear the interval
+useEffect(() => {
+  if (currentUser && id && !loading) {
+    connectWebSocket();
+  }
+
+  return () => {
+    // Cleanup on unmount
+    if (wsRef.current && wsRef.current.close) {
+      wsRef.current.close();
+    }
+    if (reconnectTimeoutRef.current) {
+      clearInterval(reconnectTimeoutRef.current); // Changed from clearTimeout
+      reconnectTimeoutRef.current = null;
+    }
+  };
+}, [currentUser, id, loading]);
+
+// Update toggleBlindMode to work without WebSocket
+const toggleBlindMode = async () => {
+  if (!isProjectOwner()) {
+    alert('Only project owner can change blind mode settings');
     return;
   }
 
-  // Try multiple WebSocket endpoints - one of these should work
-  const endpoints = [
-    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/ws?projectId=${id}&userId=${currentUser.id}&token=${token}`,
-    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/websocket?projectId=${id}&userId=${currentUser.id}&token=${token}`,
-    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/socket.io/?projectId=${id}&userId=${currentUser.id}&token=${token}&transport=websocket`,
-    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/?projectId=${id}&userId=${currentUser.id}&token=${token}`
-  ];
+  const newBlindMode = !blindMode;
+  
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/blind-mode`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ blindMode: newBlindMode })
+    });
 
-  let currentEndpointIndex = 0;
-
-  const tryConnect = () => {
-    if (currentEndpointIndex >= endpoints.length) {
-      console.error('❌ All WebSocket endpoints failed');
-      return;
-    }
-
-    const wsUrl = endpoints[currentEndpointIndex];
-    console.log(`🔌 Attempting WebSocket connection to: ${wsUrl}`);
-
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    try {
-      wsRef.current = new WebSocket(wsUrl);
+    if (response.ok) {
+      setBlindMode(newBlindMode);
+      localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(newBlindMode));
+      reloadScreeningData();
       
-      wsRef.current.onopen = () => {
-        console.log(`✅ WebSocket connected successfully to endpoint ${currentEndpointIndex}`);
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('📨 WebSocket message received:', data);
-          
-          switch (data.type) {
-            case 'SCREENING_UPDATE':
-              if (data.decision) {
-                handleScreeningUpdate(data.decision);
-              }
-              break;
-            case 'USER_JOINED':
-              setOnlineUsers(data.users || []);
-              break;
-            case 'USER_LEFT':
-              setOnlineUsers(data.users || []);
-              break;
-            case 'USERS_LIST':
-              setOnlineUsers(data.users || []);
-              break;
-            case 'BLIND_MODE_UPDATED':
-            case 'BLIND_MODE_UPDATE':
-              if (data.projectId === id) {
-                setBlindMode(data.blindMode);
-                localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(data.blindMode));
-                reloadScreeningData();
-              }
-              break;
-            case 'CONNECTION_SUCCESS':
-              console.log('✅ Server confirmed WebSocket connection');
-              break;
-            default:
-              console.log('Unknown WebSocket message type:', data.type);
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error, 'Raw data:', event.data);
-        }
-      };
-
-      wsRef.current.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason);
-        
-        if (event.code === 404 || event.code === 1006) {
-          // Try next endpoint on 404 or abnormal closure
-          currentEndpointIndex++;
-          console.log(`🔄 Trying next WebSocket endpoint...`);
-          setTimeout(tryConnect, 1000);
-        } else if (!reconnectTimeoutRef.current) {
-          // Regular reconnection for other errors
-          const reconnectDelay = 3000;
-          console.log(`Attempting to reconnect WebSocket in ${reconnectDelay}ms...`);
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            connectWebSocket();
-          }, reconnectDelay);
-        }
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('❌ WebSocket connection error:', error);
-        
-        // Try next endpoint on connection error
-        currentEndpointIndex++;
-        setTimeout(tryConnect, 1000);
-      };
-
-    } catch (error) {
-      console.error('💥 Failed to create WebSocket connection:', error);
-      currentEndpointIndex++;
-      setTimeout(tryConnect, 1000);
+      // No WebSocket - just refresh data
+      setTimeout(() => {
+        refreshScreeningData();
+      }, 1000);
+    } else {
+      throw new Error('Failed to update blind mode');
     }
-  };
-
-  tryConnect();
+  } catch (error) {
+    console.error('Error updating blind mode:', error);
+    setBlindMode(newBlindMode);
+    localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(newBlindMode));
+  }
 };
   const handleScreeningUpdate = (decision) => {
     setCollaborativeData(prev => {
