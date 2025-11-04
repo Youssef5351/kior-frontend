@@ -324,68 +324,125 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     };
   }, [id, currentUser]);
 
-  const connectWebSocket = () => {
-    if (!currentUser || !id) return;
+ const connectWebSocket = () => {
+  if (!currentUser || !id) return;
 
-    const token = localStorage.getItem('token');
-    const wsUrl = `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/?projectId=${id}&userId=${currentUser.id}&token=${token}`;
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.warn('No token available for WebSocket connection');
+    return;
+  }
+
+  // Try multiple WebSocket endpoints - one of these should work
+  const endpoints = [
+    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/ws?projectId=${id}&userId=${currentUser.id}&token=${token}`,
+    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/websocket?projectId=${id}&userId=${currentUser.id}&token=${token}`,
+    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/socket.io/?projectId=${id}&userId=${currentUser.id}&token=${token}&transport=websocket`,
+    `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/?projectId=${id}&userId=${currentUser.id}&token=${token}`
+  ];
+
+  let currentEndpointIndex = 0;
+
+  const tryConnect = () => {
+    if (currentEndpointIndex >= endpoints.length) {
+      console.error('❌ All WebSocket endpoints failed');
+      return;
+    }
+
+    const wsUrl = endpoints[currentEndpointIndex];
+    console.log(`🔌 Attempting WebSocket connection to: ${wsUrl}`);
+
     if (wsRef.current) {
       wsRef.current.close();
     }
-    
-    wsRef.current = new WebSocket(wsUrl);
-    
-    wsRef.current.onopen = () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-    };
 
-    wsRef.current.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        switch (data.type) {
-          case 'SCREENING_UPDATE':
-            handleScreeningUpdate(data.decision);
-            break;
-          case 'USER_JOINED':
-            setOnlineUsers(data.users || []);
-            break;
-          case 'USER_LEFT':
-            setOnlineUsers(data.users || []);
-            break;
-          case 'USERS_LIST':
-            setOnlineUsers(data.users || []);
-            break;
-          case 'BLIND_MODE_UPDATED':
-          case 'BLIND_MODE_UPDATE':
-            if (data.projectId === id) {
-              setBlindMode(data.blindMode);
-              localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(data.blindMode));
-              reloadScreeningData();
-            }
-            break;
+    try {
+      wsRef.current = new WebSocket(wsUrl);
+      
+      wsRef.current.onopen = () => {
+        console.log(`✅ WebSocket connected successfully to endpoint ${currentEndpointIndex}`);
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
         }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
-    
-    wsRef.current.onclose = (event) => {
-      if (event.code !== 1001 && !reconnectTimeoutRef.current) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connectWebSocket();
-        }, 3000);
-      }
-    };
-    
-    wsRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+      };
+
+      wsRef.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📨 WebSocket message received:', data);
+          
+          switch (data.type) {
+            case 'SCREENING_UPDATE':
+              if (data.decision) {
+                handleScreeningUpdate(data.decision);
+              }
+              break;
+            case 'USER_JOINED':
+              setOnlineUsers(data.users || []);
+              break;
+            case 'USER_LEFT':
+              setOnlineUsers(data.users || []);
+              break;
+            case 'USERS_LIST':
+              setOnlineUsers(data.users || []);
+              break;
+            case 'BLIND_MODE_UPDATED':
+            case 'BLIND_MODE_UPDATE':
+              if (data.projectId === id) {
+                setBlindMode(data.blindMode);
+                localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(data.blindMode));
+                reloadScreeningData();
+              }
+              break;
+            case 'CONNECTION_SUCCESS':
+              console.log('✅ Server confirmed WebSocket connection');
+              break;
+            default:
+              console.log('Unknown WebSocket message type:', data.type);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error, 'Raw data:', event.data);
+        }
+      };
+
+      wsRef.current.onclose = (event) => {
+        console.log('🔌 WebSocket closed:', event.code, event.reason);
+        
+        if (event.code === 404 || event.code === 1006) {
+          // Try next endpoint on 404 or abnormal closure
+          currentEndpointIndex++;
+          console.log(`🔄 Trying next WebSocket endpoint...`);
+          setTimeout(tryConnect, 1000);
+        } else if (!reconnectTimeoutRef.current) {
+          // Regular reconnection for other errors
+          const reconnectDelay = 3000;
+          console.log(`Attempting to reconnect WebSocket in ${reconnectDelay}ms...`);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            connectWebSocket();
+          }, reconnectDelay);
+        }
+      };
+
+      wsRef.current.onerror = (error) => {
+        console.error('❌ WebSocket connection error:', error);
+        
+        // Try next endpoint on connection error
+        currentEndpointIndex++;
+        setTimeout(tryConnect, 1000);
+      };
+
+    } catch (error) {
+      console.error('💥 Failed to create WebSocket connection:', error);
+      currentEndpointIndex++;
+      setTimeout(tryConnect, 1000);
+    }
   };
 
+  tryConnect();
+};
   const handleScreeningUpdate = (decision) => {
     setCollaborativeData(prev => {
       const newDecisions = prev.decisions.filter(d => 
