@@ -324,75 +324,68 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     };
   }, [id, currentUser]);
 
-const connectWebSocket = () => {
-  console.log('🔌 WebSocket not available, using polling instead');
-  // Don't actually connect to WebSocket
-  wsRef.current = { readyState: 3 }; // CLOSED state
-  
-  // Start polling for updates every 5 seconds
-  if (!reconnectTimeoutRef.current) {
-    reconnectTimeoutRef.current = setInterval(() => {
-      refreshScreeningData();
-    }, 5000);
-  }
-};
+  const connectWebSocket = () => {
+    if (!currentUser || !id) return;
 
-// Update your cleanup to clear the interval
-useEffect(() => {
-  if (currentUser && id && !loading) {
-    connectWebSocket();
-  }
-
-  return () => {
-    // Cleanup on unmount
-    if (wsRef.current && wsRef.current.close) {
+    const token = localStorage.getItem('token');
+const wsUrl = `wss://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com?projectId=${id}&userId=${currentUser.id}&token=${token}`;    
+    if (wsRef.current) {
       wsRef.current.close();
     }
-    if (reconnectTimeoutRef.current) {
-      clearInterval(reconnectTimeoutRef.current); // Changed from clearTimeout
-      reconnectTimeoutRef.current = null;
-    }
+    
+    wsRef.current = new WebSocket(wsUrl);
+    
+    wsRef.current.onopen = () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    };
+
+    wsRef.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case 'SCREENING_UPDATE':
+            handleScreeningUpdate(data.decision);
+            break;
+          case 'USER_JOINED':
+            setOnlineUsers(data.users || []);
+            break;
+          case 'USER_LEFT':
+            setOnlineUsers(data.users || []);
+            break;
+          case 'USERS_LIST':
+            setOnlineUsers(data.users || []);
+            break;
+          case 'BLIND_MODE_UPDATED':
+          case 'BLIND_MODE_UPDATE':
+            if (data.projectId === id) {
+              setBlindMode(data.blindMode);
+              localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(data.blindMode));
+              reloadScreeningData();
+            }
+            break;
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    wsRef.current.onclose = (event) => {
+      if (event.code !== 1001 && !reconnectTimeoutRef.current) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectWebSocket();
+        }, 3000);
+      }
+    };
+    
+    wsRef.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
   };
-}, [currentUser, id, loading]);
 
-// Update toggleBlindMode to work without WebSocket
-const toggleBlindMode = async () => {
-  if (!isProjectOwner()) {
-    alert('Only project owner can change blind mode settings');
-    return;
-  }
-
-  const newBlindMode = !blindMode;
-  
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/blind-mode`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ blindMode: newBlindMode })
-    });
-
-    if (response.ok) {
-      setBlindMode(newBlindMode);
-      localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(newBlindMode));
-      reloadScreeningData();
-      
-      // No WebSocket - just refresh data
-      setTimeout(() => {
-        refreshScreeningData();
-      }, 1000);
-    } else {
-      throw new Error('Failed to update blind mode');
-    }
-  } catch (error) {
-    console.error('Error updating blind mode:', error);
-    setBlindMode(newBlindMode);
-    localStorage.setItem(`screening-blindmode-${id}`, JSON.stringify(newBlindMode));
-  }
-};
   const handleScreeningUpdate = (decision) => {
     setCollaborativeData(prev => {
       const newDecisions = prev.decisions.filter(d => 
@@ -420,6 +413,7 @@ const toggleBlindMode = async () => {
       }
     }
   };
+
 
   const isProjectOwner = () => {
     return currentUser && projectOwnerId && currentUser.id === projectOwnerId;
