@@ -180,11 +180,14 @@ const Screening = ({ projectId }) => {
     }
   };
 
-  useEffect(() => {
-    if (!loading && currentUser) {
-      reloadScreeningData();
-    }
-  }, [blindMode, currentUser, loading]);
+// Add this debug useEffect
+useEffect(() => {
+  console.log('🔍 decisions state changed:', Object.keys(decisions).length, 'decisions');
+}, [decisions]);
+
+useEffect(() => {
+  console.log('🔍 loading state changed:', loading);
+}, [loading]);
 
   const getArticleConflicts = (articleId) => {
     if (blindMode) {
