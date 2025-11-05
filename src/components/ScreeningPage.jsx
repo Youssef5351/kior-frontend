@@ -562,6 +562,10 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     
     setArticles(nonDuplicateArticles);
 
+    // Always load from localStorage first (this has the user's decisions)
+    loadLocalStorageData();
+    
+    // Then try to load from API
     try {
       const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -569,48 +573,26 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
 
       if (screeningResponse.ok) {
         const screeningData = await screeningResponse.json();
-        
-        // ADD DEBUG LOGS HERE
-        console.log('🔍 DEBUG - Full screening data:', screeningData);
-        console.log('🔍 DEBUG - Decisions array:', screeningData.decisions);
-        console.log('🔍 DEBUG - Current user ID:', userData.id);
-        
-        if (screeningData.decisions && screeningData.decisions.length > 0) {
-          console.log('🔍 DEBUG - All decisions:', screeningData.decisions);
-          console.log('🔍 DEBUG - Filtered decisions for current user:', 
-            screeningData.decisions.filter(decision => decision.userId === userData.id)
-          );
-        }
-        
         setCollaborativeData(screeningData);
         
+        // Only update decisions from API if we can properly identify user's decisions
         const userDecisions = {};
-        const userNotes = {};
-        
         screeningData.decisions?.forEach(decision => {
-          console.log('🔍 Processing decision:', decision); // DEBUG
+          // If we find a way to identify user decisions, use them
+          // Otherwise, stick with localStorage data
           if (decision.userId === userData.id) {
             userDecisions[decision.articleId] = decision.status;
-            console.log(`🔍 Added decision for article ${decision.articleId}: ${decision.status}`); // DEBUG
           }
         });
         
-        screeningData.notes?.forEach(note => {
-          if (note.userId === userData.id) {
-            userNotes[note.articleId] = note.notes;
-          }
-        });
-        
-        console.log('🔍 DEBUG - Final userDecisions object:', userDecisions); // DEBUG
-        setDecisions(userDecisions);
-        setNotes(userNotes);
-      } else {
-        console.log('⚠️ Screening API failed, loading from localStorage');
-        loadLocalStorageData();
+        // Only update if we found user decisions in API
+        if (Object.keys(userDecisions).length > 0) {
+          setDecisions(userDecisions);
+        }
       }
     } catch (error) {
       console.error('Error loading screening data:', error);
-      loadLocalStorageData();
+      // We already loaded from localStorage, so we're good
     }
 
     setLoading(false);
@@ -618,8 +600,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     console.error('Error loading project data:', error);
     setLoading(false);
   }
-};
-  useEffect(() => {
+};  useEffect(() => {
     if (currentUser && id && !loading) {
       connectWebSocket();
     }
