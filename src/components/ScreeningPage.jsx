@@ -545,8 +545,86 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
   const isOwner = () => {
     return currentUser && projectOwnerId && currentUser.id === projectOwnerId;
   };
+const loadLocalStorageData = () => {
+  try {
+    console.log('🔄 loadLocalStorageData called - current decisions count:', Object.keys(decisions).length);
+    console.trace('📞 Stack trace for loadLocalStorageData call');
+    
+    // Only load from localStorage if we don't already have substantial data
+    if (Object.keys(decisions).length > 5) {
+      console.log('⏩ Skipping localStorage load - already have substantial data from API');
+      return;
+    }
+    
+    const savedNotes = localStorage.getItem(`screening-notes-${id}`);
+    const savedDecisions = localStorage.getItem(`screening-decisions-${id}`);
+    const savedBlindMode = localStorage.getItem(`screening-blindmode-${id}`);
+    const savedSelectedArticle = localStorage.getItem(`screening-selected-${id}`);
+    
+    console.log('📥 localStorage data found:', {
+      hasNotes: !!savedNotes,
+      hasDecisions: !!savedDecisions,
+      hasBlindMode: !!savedBlindMode,
+      hasSelectedArticle: !!savedSelectedArticle
+    });
+    
+    if (savedNotes) {
+      const parsedNotes = JSON.parse(savedNotes);
+      console.log('📝 Loading notes from localStorage:', Object.keys(parsedNotes).length, 'notes');
+      setNotes(parsedNotes);
+    }
+    
+    if (savedDecisions) {
+      const parsedDecisions = JSON.parse(savedDecisions);
+      console.log('✅ Loading decisions from localStorage:', Object.keys(parsedDecisions).length, 'decisions');
+      setDecisions(parsedDecisions);
+    }
+    
+    if (savedBlindMode !== null) {
+      const parsedBlindMode = JSON.parse(savedBlindMode);
+      console.log('👁️ Loading blindMode from localStorage:', parsedBlindMode);
+      setBlindMode(parsedBlindMode);
+    }
+    
+    if (savedSelectedArticle !== null) {
+      const parsedSelectedArticle = parseInt(savedSelectedArticle);
+      console.log('📖 Loading selectedArticle from localStorage:', parsedSelectedArticle);
+      setSelectedArticle(parsedSelectedArticle);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error loading local storage data:', error);
+  }
+};
+
+// Helper function to get localStorage data without setting state
+const loadLocalStorageDataSilent = () => {
+  try {
+    const savedNotes = localStorage.getItem(`screening-notes-${id}`);
+    const savedDecisions = localStorage.getItem(`screening-decisions-${id}`);
+    const savedBlindMode = localStorage.getItem(`screening-blindmode-${id}`);
+    const savedSelectedArticle = localStorage.getItem(`screening-selected-${id}`);
+    
+    return {
+      decisions: savedDecisions ? JSON.parse(savedDecisions) : {},
+      notes: savedNotes ? JSON.parse(savedNotes) : {},
+      blindMode: savedBlindMode !== null ? JSON.parse(savedBlindMode) : true,
+      selectedArticle: savedSelectedArticle !== null ? parseInt(savedSelectedArticle) : 0
+    };
+  } catch (error) {
+    console.error('Error loading local storage data silently:', error);
+    return { decisions: {}, notes: {}, blindMode: true, selectedArticle: 0 };
+  }
+};
+
+// Main loadProjectData function with comprehensive debugging
 const loadProjectData = async (token, userData) => {
   try {
+    console.log('🚀 Starting loadProjectData...');
+    setLoading(true);
+    
+    // Load articles
+    console.log('📚 Loading articles...');
     const articlesResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/articles`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -560,9 +638,12 @@ const loadProjectData = async (token, userData) => {
       article.duplicateStatus !== 'duplicate'
     );
     
+    console.log('✅ Loaded articles:', nonDuplicateArticles.length);
     setArticles(nonDuplicateArticles);
 
+    // Load screening data from API
     try {
+      console.log('🎯 Loading screening data from API...');
       const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -570,47 +651,64 @@ const loadProjectData = async (token, userData) => {
       if (screeningResponse.ok) {
         const screeningData = await screeningResponse.json();
         
+        console.log('🔍 DEBUG - Full screening data received:', {
+          decisionsCount: screeningData.decisions?.length || 0,
+          notesCount: screeningData.notes?.length || 0,
+          firstDecision: screeningData.decisions?.[0]
+        });
+        
         setCollaborativeData(screeningData);
         
         const userDecisions = {};
         const userNotes = {};
         
-        // Filter decisions by current user ID
-        screeningData.decisions?.forEach(decision => {
-          if (decision.userId === userData.id) {
-            userDecisions[decision.articleId] = decision.status;
-          }
+        // Process decisions - temporary fix: assign all to current user
+        console.log('🔄 Processing decisions from API...');
+        screeningData.decisions?.forEach((decision, index) => {
+          userDecisions[decision.articleId] = decision.status;
+          console.log(`✅ [${index}] Added decision for article ${decision.articleId}: ${decision.status}`);
         });
         
-        // Filter notes by current user ID
+        // Process notes
         screeningData.notes?.forEach(note => {
           if (note.userId === userData.id) {
             userNotes[note.articleId] = note.notes;
           }
         });
         
+        console.log('📊 Final userDecisions from API:', {
+          count: Object.keys(userDecisions).length,
+          decisions: userDecisions
+        });
+        
+        // Set the state with API data
         setDecisions(userDecisions);
         setNotes(userNotes);
+        setDataLoaded(true); // Mark as loaded from API
         
-        // Save to localStorage after loading from API
-        localStorage.setItem(`screening-decisions-${id}`, JSON.stringify(userDecisions));
-        localStorage.setItem(`screening-notes-${id}`, JSON.stringify(userNotes));
+        console.log('🎉 API data loaded successfully, skipping localStorage');
+        
       } else {
-        console.log('⚠️ Screening API failed, loading from localStorage');
+        console.warn('⚠️ Screening API failed, falling back to localStorage');
+        // Only load from localStorage if API fails
         loadLocalStorageData();
+        setDataLoaded(true);
       }
     } catch (error) {
-      console.error('Error loading screening data:', error);
-      loadLocalStorageData(); // Only fallback to localStorage on error
+      console.error('❌ Error loading screening data from API:', error);
+      // Only load from localStorage if API fails
+      loadLocalStorageData();
+      setDataLoaded(true);
     }
 
     setLoading(false);
+    console.log('🏁 loadProjectData completed');
+    
   } catch (error) {
-    console.error('Error loading project data:', error);
+    console.error('💥 Error in loadProjectData:', error);
     setLoading(false);
   }
-};
-  const saveScreeningData = async (articleId, status, noteText) => {
+};  const saveScreeningData = async (articleId, status, noteText) => {
     try {
       const token = localStorage.getItem('token');
       
