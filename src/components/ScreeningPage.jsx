@@ -570,47 +570,35 @@ const loadProjectData = async (token, userData) => {
       if (screeningResponse.ok) {
         const screeningData = await screeningResponse.json();
         
-        // DEBUG: Check the actual structure of decisions
         console.log('🔍 DEBUG - First decision object:', screeningData.decisions[0]);
         console.log('🔍 DEBUG - All keys in first decision:', Object.keys(screeningData.decisions[0]));
-        
-        // Check if userId exists in a different field
-        const firstDecision = screeningData.decisions[0];
-        if (firstDecision) {
-          console.log('🔍 DEBUG - Looking for user fields:');
-          Object.keys(firstDecision).forEach(key => {
-            if (key.toLowerCase().includes('user')) {
-              console.log(`🔍 Found user field: ${key} =`, firstDecision[key]);
-            }
-          });
-        }
         
         setCollaborativeData(screeningData);
         
         const userDecisions = {};
         const userNotes = {};
         
-        // TEMPORARY FIX: Assume all decisions belong to current user
-        // This is just for testing - we'll fix it properly once we find the user field
+        // Since decisions don't have userId, assume all belong to current user
+        // This works for single-user projects, but you'll need to fix the backend later
         screeningData.decisions?.forEach(decision => {
-          console.log('🔍 Decision object:', decision);
-          
-          // For now, assign all decisions to current user to test if it works
           userDecisions[decision.articleId] = decision.status;
-          console.log(`✅ TEMP: Added decision for article ${decision.articleId}: ${decision.status}`);
+          console.log(`✅ Added decision for article ${decision.articleId}: ${decision.status}`);
         });
         
         console.log('🔍 DEBUG - Final userDecisions:', userDecisions);
         
         setDecisions(userDecisions);
         setNotes(userNotes);
+        
+        // DON'T call loadLocalStorageData here - it overwrites our API data
+        // Only load localStorage as fallback if API fails
       } else {
         console.log('⚠️ Screening API failed, loading from localStorage');
         loadLocalStorageData();
       }
     } catch (error) {
       console.error('Error loading screening data:', error);
-      loadLocalStorageData();
+      loadLocalStorageData(); // Only fallback to localStorage on error
     }
 
     setLoading(false);
@@ -618,8 +606,7 @@ const loadProjectData = async (token, userData) => {
     console.error('Error loading project data:', error);
     setLoading(false);
   }
-};
-  const saveScreeningData = async (articleId, status, noteText) => {
+};  const saveScreeningData = async (articleId, status, noteText) => {
     try {
       const token = localStorage.getItem('token');
       
