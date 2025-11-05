@@ -545,64 +545,80 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
   const isOwner = () => {
     return currentUser && projectOwnerId && currentUser.id === projectOwnerId;
   };
-  const loadProjectData = async (token, userData) => {
+ const loadProjectData = async (token, userData) => {
+  try {
+    const articlesResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/articles`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!articlesResponse.ok) {
+      throw new Error('Failed to load articles');
+    }
+
+    const articlesData = await articlesResponse.json();
+    const nonDuplicateArticles = articlesData.filter(article => 
+      article.duplicateStatus !== 'duplicate'
+    );
+    
+    setArticles(nonDuplicateArticles);
+
     try {
-      const articlesResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/articles`, {
+      const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!articlesResponse.ok) {
-        throw new Error('Failed to load articles');
-      }
-
-      const articlesData = await articlesResponse.json();
-      const nonDuplicateArticles = articlesData.filter(article => 
-        article.duplicateStatus !== 'duplicate'
-      );
-      
-      setArticles(nonDuplicateArticles);
-
-      try {
-        const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (screeningResponse.ok) {
-          const screeningData = await screeningResponse.json();
-          setCollaborativeData(screeningData);
-          
-          const userDecisions = {};
-          const userNotes = {};
-          
-          screeningData.decisions?.forEach(decision => {
-            if (decision.userId === userData.id) {
-              userDecisions[decision.articleId] = decision.status;
-            }
-          });
-          
-          screeningData.notes?.forEach(note => {
-            if (note.userId === userData.id) {
-              userNotes[note.articleId] = note.notes;
-            }
-          });
-          
-          setDecisions(userDecisions);
-          setNotes(userNotes);
-        } else {
-          loadLocalStorageData();
+      if (screeningResponse.ok) {
+        const screeningData = await screeningResponse.json();
+        
+        // ADD DEBUG LOGS HERE
+        console.log('🔍 DEBUG - Full screening data:', screeningData);
+        console.log('🔍 DEBUG - Decisions array:', screeningData.decisions);
+        console.log('🔍 DEBUG - Current user ID:', userData.id);
+        
+        if (screeningData.decisions && screeningData.decisions.length > 0) {
+          console.log('🔍 DEBUG - All decisions:', screeningData.decisions);
+          console.log('🔍 DEBUG - Filtered decisions for current user:', 
+            screeningData.decisions.filter(decision => decision.userId === userData.id)
+          );
         }
-      } catch (error) {
-        console.error('Error loading screening data:', error);
+        
+        setCollaborativeData(screeningData);
+        
+        const userDecisions = {};
+        const userNotes = {};
+        
+        screeningData.decisions?.forEach(decision => {
+          console.log('🔍 Processing decision:', decision); // DEBUG
+          if (decision.userId === userData.id) {
+            userDecisions[decision.articleId] = decision.status;
+            console.log(`🔍 Added decision for article ${decision.articleId}: ${decision.status}`); // DEBUG
+          }
+        });
+        
+        screeningData.notes?.forEach(note => {
+          if (note.userId === userData.id) {
+            userNotes[note.articleId] = note.notes;
+          }
+        });
+        
+        console.log('🔍 DEBUG - Final userDecisions object:', userDecisions); // DEBUG
+        setDecisions(userDecisions);
+        setNotes(userNotes);
+      } else {
+        console.log('⚠️ Screening API failed, loading from localStorage');
         loadLocalStorageData();
       }
-
-      setLoading(false);
     } catch (error) {
-      console.error('Error loading project data:', error);
-      setLoading(false);
+      console.error('Error loading screening data:', error);
+      loadLocalStorageData();
     }
-  };
 
+    setLoading(false);
+  } catch (error) {
+    console.error('Error loading project data:', error);
+    setLoading(false);
+  }
+};
   useEffect(() => {
     if (currentUser && id && !loading) {
       connectWebSocket();
