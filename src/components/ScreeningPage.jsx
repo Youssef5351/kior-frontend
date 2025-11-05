@@ -545,7 +545,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
   const isOwner = () => {
     return currentUser && projectOwnerId && currentUser.id === projectOwnerId;
   };
- const loadProjectData = async (token, userData) => {
+const loadProjectData = async (token, userData) => {
   try {
     const articlesResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/articles`, {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -562,10 +562,6 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     
     setArticles(nonDuplicateArticles);
 
-    // Always load from localStorage first (this has the user's decisions)
-    loadLocalStorageData();
-    
-    // Then try to load from API
     try {
       const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -573,26 +569,48 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
 
       if (screeningResponse.ok) {
         const screeningData = await screeningResponse.json();
+        
+        // DEBUG: Check the actual structure of decisions
+        console.log('🔍 DEBUG - First decision object:', screeningData.decisions[0]);
+        console.log('🔍 DEBUG - All keys in first decision:', Object.keys(screeningData.decisions[0]));
+        
+        // Check if userId exists in a different field
+        const firstDecision = screeningData.decisions[0];
+        if (firstDecision) {
+          console.log('🔍 DEBUG - Looking for user fields:');
+          Object.keys(firstDecision).forEach(key => {
+            if (key.toLowerCase().includes('user')) {
+              console.log(`🔍 Found user field: ${key} =`, firstDecision[key]);
+            }
+          });
+        }
+        
         setCollaborativeData(screeningData);
         
-        // Only update decisions from API if we can properly identify user's decisions
         const userDecisions = {};
+        const userNotes = {};
+        
+        // TEMPORARY FIX: Assume all decisions belong to current user
+        // This is just for testing - we'll fix it properly once we find the user field
         screeningData.decisions?.forEach(decision => {
-          // If we find a way to identify user decisions, use them
-          // Otherwise, stick with localStorage data
-          if (decision.userId === userData.id) {
-            userDecisions[decision.articleId] = decision.status;
-          }
+          console.log('🔍 Decision object:', decision);
+          
+          // For now, assign all decisions to current user to test if it works
+          userDecisions[decision.articleId] = decision.status;
+          console.log(`✅ TEMP: Added decision for article ${decision.articleId}: ${decision.status}`);
         });
         
-        // Only update if we found user decisions in API
-        if (Object.keys(userDecisions).length > 0) {
-          setDecisions(userDecisions);
-        }
+        console.log('🔍 DEBUG - Final userDecisions:', userDecisions);
+        
+        setDecisions(userDecisions);
+        setNotes(userNotes);
+      } else {
+        console.log('⚠️ Screening API failed, loading from localStorage');
+        loadLocalStorageData();
       }
     } catch (error) {
       console.error('Error loading screening data:', error);
-      // We already loaded from localStorage, so we're good
+      loadLocalStorageData();
     }
 
     setLoading(false);
@@ -600,21 +618,7 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
     console.error('Error loading project data:', error);
     setLoading(false);
   }
-};  useEffect(() => {
-    if (currentUser && id && !loading) {
-      connectWebSocket();
-    }
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-    };
-  }, [currentUser, id, loading]);
-
+};
   const saveScreeningData = async (articleId, status, noteText) => {
     try {
       const token = localStorage.getItem('token');
