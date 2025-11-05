@@ -570,28 +570,31 @@ const loadProjectData = async (token, userData) => {
       if (screeningResponse.ok) {
         const screeningData = await screeningResponse.json();
         
-        console.log('🔍 DEBUG - First decision object:', screeningData.decisions[0]);
-        console.log('🔍 DEBUG - All keys in first decision:', Object.keys(screeningData.decisions[0]));
-        
         setCollaborativeData(screeningData);
         
         const userDecisions = {};
         const userNotes = {};
         
-        // Since decisions don't have userId, assume all belong to current user
-        // This works for single-user projects, but you'll need to fix the backend later
+        // Filter decisions by current user ID
         screeningData.decisions?.forEach(decision => {
-          userDecisions[decision.articleId] = decision.status;
-          console.log(`✅ Added decision for article ${decision.articleId}: ${decision.status}`);
+          if (decision.userId === userData.id) {
+            userDecisions[decision.articleId] = decision.status;
+          }
         });
         
-        console.log('🔍 DEBUG - Final userDecisions:', userDecisions);
+        // Filter notes by current user ID
+        screeningData.notes?.forEach(note => {
+          if (note.userId === userData.id) {
+            userNotes[note.articleId] = note.notes;
+          }
+        });
         
         setDecisions(userDecisions);
         setNotes(userNotes);
         
-        // DON'T call loadLocalStorageData here - it overwrites our API data
-        // Only load localStorage as fallback if API fails
+        // Save to localStorage after loading from API
+        localStorage.setItem(`screening-decisions-${id}`, JSON.stringify(userDecisions));
+        localStorage.setItem(`screening-notes-${id}`, JSON.stringify(userNotes));
       } else {
         console.log('⚠️ Screening API failed, loading from localStorage');
         loadLocalStorageData();
@@ -606,7 +609,8 @@ const loadProjectData = async (token, userData) => {
     console.error('Error loading project data:', error);
     setLoading(false);
   }
-};  const saveScreeningData = async (articleId, status, noteText) => {
+};
+  const saveScreeningData = async (articleId, status, noteText) => {
     try {
       const token = localStorage.getItem('token');
       
