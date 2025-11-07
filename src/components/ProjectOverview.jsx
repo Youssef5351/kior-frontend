@@ -457,11 +457,23 @@ setArticlesAfterDuplicates(remainingArticles);
   }, [projectId]);
 
 const resolveAllDuplicates = async () => {
-  if (!projectId) return;
+  // Check if already resolved for this project
+  const resolvedProjects = JSON.parse(localStorage.getItem('resolvedDuplicateProjects') || '[]');
+  if (resolvedProjects.includes(projectId)) {
+    await swal({
+      icon: 'info',
+      title: 'Already Resolved',
+      text: 'Duplicates have already been resolved for this project. Redirecting to screening...',
+      buttons: false,
+      timer: 2000,
+    });
+    navigate(`/projects/${projectId}/screening`);
+    return;
+  }
 
   const confirmed = await swal({
     title: 'Resolve All Duplicates?',
-    text: 'This will automatically detect and resolve all duplicate groups by keeping the highest quality articles and removing duplicates.',
+    text: 'This action cannot be undone. This will automatically detect and resolve all duplicate groups.',
     icon: 'warning',
     buttons: ['Cancel', 'Yes, resolve them!'],
     dangerMode: true,
@@ -484,47 +496,58 @@ const resolveAllDuplicates = async () => {
     if (response.ok) {
       const data = await response.json();
 
+      // Mark as resolved forever in localStorage
+      const resolvedProjects = JSON.parse(localStorage.getItem('resolvedDuplicateProjects') || '[]');
+      if (!resolvedProjects.includes(projectId)) {
+        resolvedProjects.push(projectId);
+        localStorage.setItem('resolvedDuplicateProjects', JSON.stringify(resolvedProjects));
+      }
+
       setDuplicates([]);
       setDuplicatesDetected(false);
 
       await swal({
         icon: 'success',
         title: 'Success!',
-        text: `✅ Resolved ${data.data.summary.duplicateGroupsFound} duplicate groups.
-
-Removed ${data.data.statistics.duplicatesRemoved} duplicates.
-Final article count: ${data.data.statistics.finalArticles}.
-Reduction: ${data.data.statistics.reduction}.
-
-Redirecting to screening page...`,
+        text: `✅ Resolved ${data.data.summary.duplicateGroupsFound} duplicate groups.`,
         buttons: false,
         timer: 2500,
       });
 
       setArticlesAfterDuplicates(data.data.statistics.finalArticles);
-      await fetchResolutionSummary();
-    await fetchProjectData(); // Refresh to get updated counts
+      await fetchProjectData();
 
       setTimeout(() => {
-        console.log('🚀 Redirecting to screening page...');
         navigate(`/projects/${projectId}/screening`);
       }, 2500);
     } else {
-      const errorData = await response.json();
+      // Better error handling
+      let errorMessage = 'Failed to resolve duplicates';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+        console.error('❌ Backend error details:', errorData);
+      } catch (e) {
+        // If response is not JSON
+        const errorText = await response.text();
+        console.error('❌ Backend error (text):', errorText);
+        errorMessage = `Server error: ${response.status}`;
+      }
+
       swal({
         icon: 'error',
         title: 'Failed',
-        text: `Failed to resolve all duplicates: ${errorData.error}`,
+        text: errorMessage,
         button: 'OK',
       });
       setDetecting(false);
     }
   } catch (error) {
-    console.error('Error resolving all duplicates:', error);
+    console.error('❌ Error resolving all duplicates:', error);
     swal({
       icon: 'error',
       title: 'Error',
-      text: 'Error resolving all duplicates',
+      text: `Network error: ${error.message}`,
       button: 'OK',
     });
     setDetecting(false);
