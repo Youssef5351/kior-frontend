@@ -55,27 +55,23 @@ const Screening = ({ projectId }) => {
   };
 
   const loadLocalStorageData = () => {
-  try {
-    // Only load from localStorage if we don't already have data from API
-    if (Object.keys(decisions).length > 0) {
-      console.log('⏩ Skipping localStorage - already have data from API');
-      return;
+    try {
+      const savedNotes = localStorage.getItem(`screening-notes-${id}`);
+      const savedDecisions = localStorage.getItem(`screening-decisions-${id}`);
+      const savedBlindMode = localStorage.getItem(`screening-blindmode-${id}`);
+      const savedSelectedArticle = localStorage.getItem(`screening-selected-${id}`);
+      
+      if (savedNotes) setNotes(JSON.parse(savedNotes));
+      if (savedDecisions) setDecisions(JSON.parse(savedDecisions));
+      if (savedBlindMode !== null) setBlindMode(JSON.parse(savedBlindMode));
+      
+      if (savedSelectedArticle !== null) setSelectedArticle(parseInt(savedSelectedArticle));
+    } catch (error) {
+      console.error('Error loading local storage data:', error);
+      
     }
-    
-    const savedNotes = localStorage.getItem(`screening-notes-${id}`);
-    const savedDecisions = localStorage.getItem(`screening-decisions-${id}`);
-    const savedBlindMode = localStorage.getItem(`screening-blindmode-${id}`);
-    const savedSelectedArticle = localStorage.getItem(`screening-selected-${id}`);
-    
-    if (savedNotes) setNotes(JSON.parse(savedNotes));
-    if (savedDecisions) setDecisions(JSON.parse(savedDecisions));
-    if (savedBlindMode !== null) setBlindMode(JSON.parse(savedBlindMode));
-    
-    if (savedSelectedArticle !== null) setSelectedArticle(parseInt(savedSelectedArticle));
-  } catch (error) {
-    console.error('Error loading local storage data:', error);
-  }
-};
+  };
+
   const getArticleStatus = (articleId) => {
     return decisions[articleId] || 'unscreened';
   };
@@ -180,14 +176,11 @@ const Screening = ({ projectId }) => {
     }
   };
 
-// Add this debug useEffect
-useEffect(() => {
-  console.log('🔍 decisions state changed:', Object.keys(decisions).length, 'decisions');
-}, [decisions]);
-
-useEffect(() => {
-  console.log('🔍 loading state changed:', loading);
-}, [loading]);
+  useEffect(() => {
+    if (!loading && currentUser) {
+      reloadScreeningData();
+    }
+  }, [blindMode, currentUser, loading]);
 
   const getArticleConflicts = (articleId) => {
     if (blindMode) {
@@ -552,89 +545,79 @@ const ConflictIcon = ({ className = "w-4 h-4" }) => (
   const isOwner = () => {
     return currentUser && projectOwnerId && currentUser.id === projectOwnerId;
   };
-// Helper function to get localStorage data without setting state
-const loadLocalStorageDataSilent = () => {
-  try {
-    const savedNotes = localStorage.getItem(`screening-notes-${id}`);
-    const savedDecisions = localStorage.getItem(`screening-decisions-${id}`);
-    const savedBlindMode = localStorage.getItem(`screening-blindmode-${id}`);
-    const savedSelectedArticle = localStorage.getItem(`screening-selected-${id}`);
-    
-    return {
-      decisions: savedDecisions ? JSON.parse(savedDecisions) : {},
-      notes: savedNotes ? JSON.parse(savedNotes) : {},
-      blindMode: savedBlindMode !== null ? JSON.parse(savedBlindMode) : true,
-      selectedArticle: savedSelectedArticle !== null ? parseInt(savedSelectedArticle) : 0
-    };
-  } catch (error) {
-    console.error('Error loading local storage data silently:', error);
-    return { decisions: {}, notes: {}, blindMode: true, selectedArticle: 0 };
-  }
-};
-
-// Main loadProjectData function with comprehensive debugging
-const loadProjectData = async (token, userData) => {
-  try {
-    setLoading(true);
-    
-    const articlesResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/articles`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-
-    if (!articlesResponse.ok) {
-      throw new Error('Failed to load articles');
-    }
-
-    const articlesData = await articlesResponse.json();
-    const nonDuplicateArticles = articlesData.filter(article => 
-      article.duplicateStatus !== 'duplicate'
-    );
-    
-    setArticles(nonDuplicateArticles);
-
+  const loadProjectData = async (token, userData) => {
     try {
-      const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
+      const articlesResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/articles`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (screeningResponse.ok) {
-        const screeningData = await screeningResponse.json();
-        setCollaborativeData(screeningData);
-        
-        const userDecisions = {};
-        const userNotes = {};
-        
-        // Process decisions - assign all to current user (temporary fix)
-        screeningData.decisions?.forEach(decision => {
-          userDecisions[decision.articleId] = decision.status;
+      if (!articlesResponse.ok) {
+        throw new Error('Failed to load articles');
+      }
+
+      const articlesData = await articlesResponse.json();
+      const nonDuplicateArticles = articlesData.filter(article => 
+        article.duplicateStatus !== 'duplicate'
+      );
+      
+      setArticles(nonDuplicateArticles);
+
+      try {
+        const screeningResponse = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${id}/screening-data`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        screeningData.notes?.forEach(note => {
-          if (note.userId === userData.id) {
-            userNotes[note.articleId] = note.notes;
-          }
-        });
-        
-        // Set the state with API data - this will persist
-        setDecisions(userDecisions);
-        setNotes(userNotes);
-        
-      } else {
-        // Only load from localStorage if API fails
+
+        if (screeningResponse.ok) {
+          const screeningData = await screeningResponse.json();
+          setCollaborativeData(screeningData);
+          
+          const userDecisions = {};
+          const userNotes = {};
+          
+          screeningData.decisions?.forEach(decision => {
+            if (decision.userId === userData.id) {
+              userDecisions[decision.articleId] = decision.status;
+            }
+          });
+          
+          screeningData.notes?.forEach(note => {
+            if (note.userId === userData.id) {
+              userNotes[note.articleId] = note.notes;
+            }
+          });
+          
+          setDecisions(userDecisions);
+          setNotes(userNotes);
+        } else {
+          loadLocalStorageData();
+        }
+      } catch (error) {
+        console.error('Error loading screening data:', error);
         loadLocalStorageData();
       }
+
+      setLoading(false);
     } catch (error) {
-      console.error('Error loading screening data:', error);
-      // Only load from localStorage if API fails
-      loadLocalStorageData();
+      console.error('Error loading project data:', error);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser && id && !loading) {
+      connectWebSocket();
     }
 
-    setLoading(false);
-  } catch (error) {
-    console.error('Error loading project data:', error);
-    setLoading(false);
-  }
-};
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [currentUser, id, loading]);
+
   const saveScreeningData = async (articleId, status, noteText) => {
     try {
       const token = localStorage.getItem('token');
@@ -829,540 +812,523 @@ const loadProjectData = async (token, userData) => {
     return matchesSearch && matchesStatus && matchesYear && matchesReviewerCount;
   });
 
-  if (accessError) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center font-bricolage">
-        <div className="text-center p-8 bg-white rounded-lg border border-gray-200">
-          <div className="text-4xl mb-4">🚫</div>
-          <h2 className="text-xl font-bold text-black mb-2">Access Denied</h2>
-          <p className="text-gray-700 mb-4">{accessError}</p>
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium"
+if (accessError) {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center font-bricolage px-4">
+      <div className="text-center p-6 bg-white rounded-lg border border-gray-200 max-w-md w-full">
+        <div className="text-4xl mb-4">🚫</div>
+        <h2 className="text-xl font-bold text-black mb-2">Access Denied</h2>
+        <p className="text-gray-700 mb-4">{accessError}</p>
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium w-full sm:w-auto"
+        >
+          Go to Dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+if (loading) return (
+  <div className="min-h-screen bg-white flex items-center justify-center font-bricolage px-4">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto"></div>
+      <p className="mt-4 text-gray-700">Loading articles...</p>
+    </div>
+  </div>
+);
+
+if (!articles.length) return (
+  <div className="min-h-screen bg-white flex items-center justify-center font-bricolage px-4">
+    <div className="text-center p-6 bg-white rounded-lg border border-gray-200 max-w-md w-full">
+      <div className="text-4xl mb-4">📚</div>
+      <h2 className="text-xl font-bold text-black mb-2">No articles imported yet</h2>
+      <p className="text-gray-700">Import some articles to get started with screening.</p>
+    </div>
+  </div>
+);
+
+const statusCount = getStatusCount();
+const totalArticles = articles.length;
+const conflictCount = getConflictCount();
+const userIsOwner = isProjectOwner();
+
+return (
+  <div className="h-screen flex flex-col lg:flex-row bg-white font-bricolage text-black">
+    {/* Mobile Navigation - Top */}
+    <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30 p-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-lg font-bold text-black">Collaborative Screening</h1>
+        <button
+          onClick={toggleBlindMode}
+          disabled={!userIsOwner}
+          className={`flex cursor-pointer items-center gap-2 px-3 py-1 rounded text-xs font-medium ${
+            blindMode 
+              ? 'bg-green-500 text-white' 
+              : 'bg-gray-200 text-gray-700'
+          } ${!userIsOwner ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <span className={`w-2 h-2 rounded-full ${blindMode ? 'bg-white' : 'bg-yellow-500'}`}></span>
+          {blindMode ? 'Blind On' : 'Blind Off'}
+        </button>
+      </div>
+    </div>
+
+    {/* Desktop Navigation - Center */}
+    <div className="hidden lg:block absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
+      <div className="flex gap-2 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+        {navigationButtons.map((button, index) => (
+          <button
+            key={index}
+            onClick={() => navigate(button.path)}
+            className="px-5 py-3 cursor-pointer text-xs font-medium text-black hover:text-black hover:bg-gray-50 rounded-md transition-colors duration-200"
           >
-            Go to Dashboard
+            {button.label}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Mobile Bottom Navigation */}
+    {selectedArticle !== null && (
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 p-4">
+        <div className="flex gap-2 justify-between">
+          <button
+            onClick={() => setSelectedArticle(prev => prev > 0 ? prev - 1 : null)}
+            className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setSelectedArticle(prev => prev < articles.length - 1 ? prev + 1 : null)}
+            className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-medium"
+          >
+            Next
           </button>
         </div>
       </div>
-    );
-  }
+    )}
 
-  if (loading) return (
-    <div className="min-h-screen bg-white flex items-center justify-center font-bricolage">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto"></div>
-        <p className="mt-4 text-gray-700">Loading articles...</p>
-      </div>
-    </div>
-  );
-
-  if (!articles.length) return (
-    <div className="min-h-screen bg-white flex items-center justify-center font-bricolage">
-      <div className="text-center p-8 bg-white rounded-lg border border-gray-200">
-        <div className="text-4xl mb-4">📚</div>
-        <h2 className="text-xl font-bold text-black mb-2">No articles imported yet</h2>
-        <p className="text-gray-700">Import some articles to get started with screening.</p>
-      </div>
-    </div>
-  );
-
-  const statusCount = getStatusCount();
-  const totalArticles = articles.length;
-  const conflictCount = getConflictCount();
-  const userIsOwner = isProjectOwner();
-
-  return (
-    <div className="h-screen flex bg-white font-bricolage text-black">
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
-        <div className="flex gap-2 bg-white border border-gray-200  -mr-12 rounded-lg p-1 shadow-sm">
-          {navigationButtons.map((button, index) => (
-            <button
-              key={index}
-              onClick={() => navigate(button.path)}
-              className="px-5 py-3 text-xs font-medium cursor-pointer text-black hover:text-black hover:bg-gray-50 rounded-md transition-colors duration-200"
-            >
-              {button.label}
-            </button>
-          ))}
+    {/* LEFT: Article list */}
+    <div className={`${selectedArticle !== null ? 'hidden lg:flex' : 'flex'} lg:w-96 flex-col bg-white border-r border-gray-200 mt-16 lg:mt-0`}>
+      <div className="p-4 lg:p-6 border-b border-gray-200 bg-gray-50">
+        <div className="hidden lg:flex justify-between items-start mb-3">
+          <h1 className="text-lg font-bold text-black">Collaborative Screening</h1>
+          <button
+            onClick={toggleBlindMode}
+            disabled={!userIsOwner}
+            className={`flex cursor-pointer items-center gap-2 px-3 py-1 rounded text-xs font-medium ${
+              blindMode 
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 text-gray-700'
+            } ${!userIsOwner ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <span className={`w-2 h-2 rounded-full ${blindMode ? 'bg-white' : 'bg-yellow-500'}`}></span>
+            {blindMode ? 'Blind Mode On' : 'Blind Mode Off'}
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2 text-xs mb-3 text-gray-600">
+          <div className={`w-2 h-2 rounded-full ${wsRef.current?.readyState === WebSocket.OPEN ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+          <span>{wsRef.current?.readyState === WebSocket.OPEN ? 'Real-time Active' : 'Connecting...'}</span>
+        </div>
+        
+        <div className="flex justify-between items-center text-sm">
+          <span className="bg-gray-200 px-2 py-1 rounded">{totalArticles} total</span>
+          <div className="flex gap-1 lg:gap-2 flex-wrap justify-end">
+            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">{statusCount.include}</span>
+            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">{statusCount.maybe}</span>
+            <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">{statusCount.exclude}</span>
+            {!blindMode && conflictCount > 0 && (
+              <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
+                <ConflictIcon className='h-3 w-3 inline-block' /> {conflictCount}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* LEFT: Article list */}
-      <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200 bg-gray-50">
-          <div className="flex justify-between items-start mb-3">
-            <h1 className="text-lg font-bold text-black">Collaborative Screening</h1>
-            <button
-              onClick={toggleBlindMode}
-              disabled={!userIsOwner}
-              className={`flex items-center cursor-pointer gap-2 px-3 py-1 rounded text-xs font-medium ${
-                blindMode 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-gray-200 text-gray-700'
-              } ${!userIsOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-              title={userIsOwner ? 'Toggle blind mode' : 'Only project owner can change blind mode'}
-            >
-              <span className={`w-2 h-2 rounded-full ${blindMode ? 'bg-white' : 'bg-yellow-500'}`}></span>
-              {blindMode ? 'Blind Mode On' : 'Blind Mode Off'}
-            </button>
-          </div>
+      {/* Search */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search articles..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-black focus:border-black bg-white text-sm"
+          />
+          <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+        </div>
+      </div>
+
+      {/* Article List */}
+      <div className="flex-1 overflow-y-auto">
+        {filteredArticles.map((article, index) => {
+          const articleStatus = getArticleStatus(article.id);
+          const otherDecisions = getOtherDecisions(article.id);
+          const conflict = getArticleConflicts(article.id);
+          const isSelected = selectedArticle === articles.findIndex(a => a.id === article.id);
           
-          <div className="flex items-center gap-2 text-xs mb-3 text-gray-600">
-            <div className={`w-2 h-2 rounded-full ${wsRef.current?.readyState === WebSocket.OPEN ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-            <span>{wsRef.current?.readyState === WebSocket.OPEN ? 'Real-time Active' : 'Connecting...'}</span>
-          </div>
-          
-          <div className="flex justify-between items-center text-sm">
-            <span className="bg-gray-200 px-2 py-1 rounded">{totalArticles} total</span>
-            <div className="flex gap-2">
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">{statusCount.include}</span>
-              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">{statusCount.maybe}</span>
-              <span className="bg-red-100 text-red-800 px-2 py-1 rounded">{statusCount.exclude}</span>
-              {!blindMode && conflictCount > 0 && (
-                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                  <ConflictIcon className='h-3 w-3 inline-block' /> {conflictCount}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search articles..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-black focus:border-black bg-white"
-            />
-            <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
-          </div>
-        </div>
-
-        {/* Article List */}
-        <div className="flex-1 overflow-y-auto">
-          {filteredArticles.map((article, index) => {
-            const articleStatus = getArticleStatus(article.id);
-            const otherDecisions = getOtherDecisions(article.id);
-            const conflict = getArticleConflicts(article.id);
-            const isSelected = selectedArticle === articles.findIndex(a => a.id === article.id);
-            
-            return (
-              <div
-                key={article.id}
-                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
-                  isSelected ? 'bg-gray-50 border-l-2 border-l-black' : ''
-                } ${!blindMode && conflict ? 'border-l-2 border-l-orange-500' : ''}`}
-                onClick={() => {
-                  const realIndex = articles.findIndex(a => a.id === article.id);
-                  setSelectedArticle(realIndex);
-                }}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {articleStatus !== 'unscreened' && (
-                      <span className={`px-2 py-1 text-xs font-medium rounded border ${getStatusColor(articleStatus)}`}>
-                        {articleStatus} (You)
-                      </span>
-                    )}
-                    
-                    {!blindMode && otherDecisions.length > 0 && (
-                      <div className="flex gap-1 flex-wrap">
-                        {otherDecisions.slice(0, 3).map(decision => (
-                          <span 
-                            key={decision.id}
-                            className={`px-2 py-1 text-xs font-medium rounded border ${getStatusColor(decision.status)}`}
-                            title={`${decision.user?.firstName || 'User'}: ${decision.status}`}
-                          >
-                            {decision.user?.firstName || 'U'}: {decision.status}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {!blindMode && conflict && (
-                      <span className="px-2 py-1 text-xs font-medium rounded bg-orange-100 text-orange-800 border border-orange-300">
-                        <ConflictIcon  className='h-3 w-3 inline-block' /> Conflict
-                      </span>
-                    )}
-                  </div>
+          return (
+            <div
+              key={article.id}
+              className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
+                isSelected ? 'bg-gray-50 border-l-2 border-l-black' : ''
+              } ${!blindMode && conflict ? 'border-l-2 border-l-orange-500' : ''}`}
+              onClick={() => {
+                const realIndex = articles.findIndex(a => a.id === article.id);
+                setSelectedArticle(realIndex);
+              }}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-1 flex-wrap">
+                  {articleStatus !== 'unscreened' && (
+                    <span className={`px-2 py-1 text-xs font-medium rounded border ${getStatusColor(articleStatus)}`}>
+                      {articleStatus}
+                    </span>
+                  )}
                   
-                  <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                    {article.date ? new Date(article.date).getFullYear() : 'N/A'}
-                  </span>
-                </div>
-                
-                <div className="text-sm font-semibold text-black mb-2 line-clamp-2">
-                  {article.title}
-                </div>
-                <div className="text-xs text-gray-700 mb-1">
-                  {article.authors?.slice(0, 2).map(a => a.name).join(", ")}
-                  {article.authors?.length > 2 && ' et al.'}
-                </div>
-                <div className="text-xs text-gray-600">{article.journal}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* CENTER: Article details */}
-    <div className="flex-1 flex flex-col p-6 mt-12">
-  <div className="bg-white border border-gray-200 rounded-lg flex-1 flex flex-col overflow-hidden relative">
-    {currentArticle ? (
-      <>
-        {/* Compact Header Section */}
-        <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex-1">
-              <h1 className="text-lg font-bold text-black line-clamp-2 mb-1">{currentArticle.title}</h1>
-              <div className="flex items-center gap-4 text-xs text-gray-600">
-                <span>Article {selectedArticle + 1} of {totalArticles}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Compact Info Grid */}
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="bg-gray-50 p-2 rounded border border-gray-200">
-              <span className="font-medium text-black text-xs">Authors</span>
-              <p className="mt-0.5 text-gray-700 ">{currentArticle.authors?.slice(0, 2).map(a => a.name).join(", ") || "No authors"}{currentArticle.authors?.length > 2 && '...'}</p>
-            </div>
-            <div className="bg-gray-50 p-2 rounded border border-gray-200">
-              <span className="font-medium text-black text-xs">Journal</span>
-              <p className="mt-0.5 text-gray-700 ">{currentArticle.journal || "N/A"}</p>
-            </div>
-            <div className="bg-gray-50 p-2 rounded border border-gray-200">
-              <span className="font-medium text-black text-xs">Date</span>
-              <p className="mt-0.5 text-gray-700">{currentArticle.date ? new Date(currentArticle.date).getFullYear() : "N/A"}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 space-y-4">
-            {!blindMode && (() => {
-              const conflict = getArticleConflicts(currentArticle.id);
-              if (!conflict) return null;
-
-              return (
-                <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                  <div className="flex items-start gap-3">
-                    <ConflictIcon className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-bold text-orange-800">Conflict Detected</h4>
-                        <div className="flex gap-2 text-xs">
-                          <span className={`px-2 py-1 rounded border ${getStatusColor(conflict.myDecision)}`}>
-                            You: {conflict.myDecision}
-                          </span>
-                          <span className="px-2 py-1 rounded bg-red-100 text-red-800 border border-red-300">
-                            {conflict.reviewerCount} other{conflict.reviewerCount > 1 ? 's' : ''} disagree
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="text-xs text-orange-700">
-                        <span className="font-medium">Other decisions:</span>
-                        {' '}
-                        {conflict.otherDecisions.join(', ')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {!blindMode && (
-              <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                <h4 className="text-sm font-medium text-blue-800 mb-2">All Reviewers' Decisions</h4>
-                <div className="space-y-2">
-                  {decisions[currentArticle.id] && decisions[currentArticle.id] !== 'unscreened' && (
-                    <div className="flex items-center justify-between bg-white p-2 rounded border border-green-200">
-                      <span className="font-medium text-green-800 text-xs">
-                        {currentUser?.firstName} {currentUser?.lastName} (You)
-                      </span>
-                      <span className={`px-2 py-1 text-xs rounded border ${getStatusColor(decisions[currentArticle.id])}`}>
-                        {decisions[currentArticle.id]}
-                      </span>
+                  {!blindMode && otherDecisions.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {otherDecisions.slice(0, 2).map(decision => (
+                        <span 
+                          key={decision.id}
+                          className={`px-2 py-1 text-xs font-medium rounded border ${getStatusColor(decision.status)}`}
+                          title={`${decision.user?.firstName || 'User'}: ${decision.status}`}
+                        >
+                          {decision.user?.firstName?.charAt(0) || 'U'}: {decision.status.charAt(0)}
+                        </span>
+                      ))}
                     </div>
                   )}
                   
-                  {getOtherDecisions(currentArticle.id).map(decision => (
-                    <div key={decision.id} className="flex items-center justify-between bg-white p-2 rounded border border-blue-200">
-                      <span className="font-medium text-blue-800 text-xs">
-                        {decision.user?.firstName} {decision.user?.lastName}
-                      </span>
-                      <span className={`px-2 py-1 text-xs rounded border ${getStatusColor(decision.status)}`}>
-                        {decision.status}
-                      </span>
-                    </div>
-                  ))}
+                  {!blindMode && conflict && (
+                    <span className="px-2 py-1 text-xs font-medium rounded bg-orange-100 text-orange-800 border border-orange-300">
+                      <ConflictIcon className='h-3 w-3 inline-block' /> 
+                    </span>
+                  )}
+                </div>
+                
+                <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                  {article.date ? new Date(article.date).getFullYear() : 'N/A'}
+                </span>
+              </div>
+              
+              <div className="text-sm font-semibold text-black mb-2 line-clamp-2">
+                {article.title}
+              </div>
+              <div className="text-xs text-gray-700 mb-1 line-clamp-1">
+                {article.authors?.slice(0, 2).map(a => a.name).join(", ")}
+                {article.authors?.length > 2 && ' et al.'}
+              </div>
+              <div className="text-xs text-gray-600 line-clamp-1">{article.journal}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    {/* CENTER: Article details - FIX 1: Added lg:mt-12 for desktop navbar spacing */}
+    <div className={`flex-1 flex flex-col ${selectedArticle !== null ? 'flex' : 'hidden lg:flex'} mt-16 lg:mt-20`}>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {currentArticle ? (
+          <>
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 bg-white sticky top-16 lg:top-0 z-10">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h1 className="text-lg font-bold text-black line-clamp-2 pr-2">{currentArticle.title}</h1>
+                    <button 
+                      onClick={() => setSelectedArticle(null)}
+                      className="lg:hidden text-gray-500 hover:text-gray-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-600">
+                    <span>Article {selectedArticle + 1} of {totalArticles}</span>
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div>
-              <h3 className="text-md font-semibold text-black mb-2">Abstract</h3>
-              <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                <p className="text-gray-800 leading-relaxed whitespace-pre-wrap text-sm">
-                  {currentArticle.abstract || "No abstract available."}
-                </p>
+              {/* Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                  <span className="font-medium text-black text-xs">Authors</span>
+                  <p className="mt-0.5 text-gray-700 line-clamp-2">{currentArticle.authors?.slice(0, 3).map(a => a.name).join(", ") || "No authors"}{currentArticle.authors?.length > 3 && '...'}</p>
+                </div>
+                <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                  <span className="font-medium text-black text-xs">Journal</span>
+                  <p className="mt-0.5 text-gray-700 line-clamp-2">{currentArticle.journal || "N/A"}</p>
+                </div>
+                <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                  <span className="font-medium text-black text-xs">Date</span>
+                  <p className="mt-0.5 text-gray-700">{currentArticle.date ? new Date(currentArticle.date).getFullYear() : "N/A"}</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                <h4 className="font-medium text-black text-sm mb-1">URL</h4>
-                <a href={currentArticle.url} target="_blank" rel="noreferrer" 
-                   className="text-blue-600 hover:text-blue-800 underline break-all text-xs">
-                  {currentArticle.url || "N/A"}
-                </a>
-              </div>
-              <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                <h4 className="font-medium text-black text-sm mb-1">Topics</h4>
-                <p className="text-xs text-gray-700">{currentArticle.topics?.map(t => t.value).join(", ") || "N/A"}</p>
+            {/* Content - FIX 2: Added bottom padding for mobile navigation */}
+            <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+              <div className="p-4 space-y-4">
+                {!blindMode && (() => {
+                  const conflict = getArticleConflicts(currentArticle.id);
+                  if (!conflict) return null;
+
+                  return (
+                    <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                      <div className="flex items-start gap-3">
+                        <ConflictIcon className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                            <h4 className="text-sm font-bold text-orange-800">Conflict Detected</h4>
+                            <div className="flex gap-2 text-xs">
+                              <span className={`px-2 py-1 rounded border ${getStatusColor(conflict.myDecision)}`}>
+                                You: {conflict.myDecision}
+                              </span>
+                              <span className="px-2 py-1 rounded bg-red-100 text-red-800 border border-red-300">
+                                {conflict.reviewerCount} other{conflict.reviewerCount > 1 ? 's' : ''} disagree
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-orange-700">
+                            <span className="font-medium">Other decisions:</span>
+                            {' '}
+                            {conflict.otherDecisions.join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {!blindMode && (
+                  <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">All Reviewers' Decisions</h4>
+                    <div className="space-y-2">
+                      {decisions[currentArticle.id] && decisions[currentArticle.id] !== 'unscreened' && (
+                        <div className="flex items-center justify-between bg-white p-2 rounded border border-green-200">
+                          <span className="font-medium text-green-800 text-xs">
+                            {currentUser?.firstName} {currentUser?.lastName} (You)
+                          </span>
+                          <span className={`px-2 py-1 text-xs rounded border ${getStatusColor(decisions[currentArticle.id])}`}>
+                            {decisions[currentArticle.id]}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {getOtherDecisions(currentArticle.id).map(decision => (
+                        <div key={decision.id} className="flex items-center justify-between bg-white p-2 rounded border border-blue-200">
+                          <span className="font-medium text-blue-800 text-xs">
+                            {decision.user?.firstName} {decision.user?.lastName}
+                          </span>
+                          <span className={`px-2 py-1 text-xs rounded border ${getStatusColor(decision.status)}`}>
+                            {decision.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="text-md font-semibold text-black mb-2">Abstract</h3>
+                  <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                    <p className="text-gray-800 leading-relaxed whitespace-pre-wrap text-sm">
+                      {currentArticle.abstract || "No abstract available."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                    <h4 className="font-medium text-black text-sm mb-1">URL</h4>
+                    <a href={currentArticle.url} target="_blank" rel="noreferrer" 
+                       className="text-blue-600 hover:text-blue-800 underline break-all text-xs">
+                      {currentArticle.url || "N/A"}
+                    </a>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                    <h4 className="font-medium text-black text-sm mb-1">Topics</h4>
+                    <p className="text-xs text-gray-700 line-clamp-2">{currentArticle.topics?.map(t => t.value).join(", ") || "N/A"}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-md font-semibold text-black mb-2">Screening Notes</h3>
+                  <textarea
+                    placeholder="Add your screening notes here..."
+                    value={notes[currentArticle.id] || ""}
+                    onChange={(e) => addNote(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-black focus:border-black resize-none bg-white text-sm"
+                    rows={3}
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <h3 className="text-md font-semibold text-black mb-2">Screening Notes</h3>
-              <textarea
-                placeholder="Add your screening notes here..."
-                value={notes[currentArticle.id] || ""}
-                onChange={(e) => addNote(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-black focus:border-black resize-none bg-white text-sm"
-                rows={3}
-              />
-            </div>
-          </div>
-        </div>
-              {/* Sticky Decision Buttons - Bottom Center */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-  <div className="flex gap-3 justify-center">
+            {/* Decision Buttons */}
+<div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 mb-16 lg:mb-0">
+  <div className="flex gap-2 lg:gap-3 justify-center">
     {(() => {
       const currentArticleStatus = getArticleStatus(currentArticle.id);
       return (
         <>
-          {/* Include Button */}
-          <div className="relative group">
-            <button 
-              onClick={() => setArticleStatus(currentArticle.id, 'include')}
-              className={`px-6 py-3 rounded-lg font-medium text-lg transition-all flex items-center gap-2 ${
-                currentArticleStatus === 'include' 
-                  ? 'bg-green-500 text-white shadow-lg' 
-                  : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-300'
-              }`}
-            >
-              <IncludeIcon className="w-30 h-5" />
-              {currentArticleStatus === 'include' ? `` : ''}
-            </button>
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
-              Include
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
+          <button 
+            onClick={() => setArticleStatus(currentArticle.id, 'include')}
+            className={`flex-1 lg:flex-none px-4 py-2 cursor-pointer lg:px-6 rounded-lg font-medium text-sm lg:text-lg transition-all flex items-center justify-center gap-2 ${
+              currentArticleStatus === 'include' 
+                ? 'bg-green-500 text-white shadow-lg' 
+                : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-300'
+            }`}
+          >
+            <IncludeIcon className="w-3 h-3 lg:w-4 lg:h-4" />
+            <span className="hidden sm:inline">Include</span>
+          </button>
 
-          {/* Maybe Button */}
-          <div className="relative group">
-            <button 
-              onClick={() => setArticleStatus(currentArticle.id, 'maybe')}
-              className={`px-6 py-3 rounded-lg font-medium text-lg transition-all flex items-center gap-2 ${
-                currentArticleStatus === 'maybe' 
-                  ? 'bg-yellow-500 text-white shadow-lg' 
-                  : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-300'
-              }`}
-            >
-              <MaybeIcon className="w-30 h-5" />
-              {currentArticleStatus === 'maybe' ? `` : ''}
-            </button>
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
-              Maybe
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
+          <button 
+            onClick={() => setArticleStatus(currentArticle.id, 'maybe')}
+            className={`flex-1 lg:flex-none px-4 py-2 cursor-pointer lg:px-6 rounded-lg font-medium text-sm lg:text-lg transition-all flex items-center justify-center gap-2 ${
+              currentArticleStatus === 'maybe' 
+                ? 'bg-yellow-500 text-white shadow-lg' 
+                : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-300'
+            }`}
+          >
+            <MaybeIcon className="w-3 h-3 lg:w-4 lg:h-4" />
+            <span className="hidden sm:inline">Maybe</span>
+          </button>
 
-          {/* Exclude Button */}
-          <div className="relative group">
-            <button 
-              onClick={() => setArticleStatus(currentArticle.id, 'exclude')}
-              className={`px-6 py-3 rounded-lg font-medium text-lg transition-all flex items-center gap-2 ${
-                currentArticleStatus === 'exclude' 
-                  ? 'bg-red-500 text-white shadow-lg' 
-                  : 'bg-red-100 text-red-800 hover:bg-red-200 border border-red-300'
-              }`}
-            >
-              <ExcludeIcon className="w-30 h-5" />
-              {currentArticleStatus === 'exclude' ? `` : ''}
-            </button>
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
-              Exclude
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
+          <button 
+            onClick={() => setArticleStatus(currentArticle.id, 'exclude')}
+            className={`flex-1 lg:flex-none px-4 py-2 cursor-pointer lg:px-6 rounded-lg font-medium text-sm lg:text-lg transition-all flex items-center justify-center gap-2 ${
+              currentArticleStatus === 'exclude' 
+                ? 'bg-red-500 text-white shadow-lg' 
+                : 'bg-red-100 text-red-800 hover:bg-red-200 border border-red-300'
+            }`}
+          >
+            <ExcludeIcon className="w-3 h-3 lg:w-4 lg:h-4" />
+            <span className="hidden sm:inline">Exclude</span>
+          </button>
         </>
       );
     })()}
-  </div>
-</div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <div className="text-4xl mb-4">📖</div>
-                <p className="text-lg">Select an article to view details</p>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-    {/* RIGHT: Filters & Progress */}
-<div className="w-80 bg-white border-l border-gray-200 flex flex-col">
-  {/* Progress Section - Fixed Height */}
-  <div className="p-6 border-b border-gray-200 flex-shrink-0">
-    <h3 className="font-bold text-lg text-black mb-4">Screening Progress</h3>
-    <div className="space-y-4">
-      <div>
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-green-700 font-medium">Included</span>
-          <span>{statusCount.include}/{totalArticles}</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-green-500 h-2 rounded-full" 
-            style={{ width: `${(statusCount.include / totalArticles) * 100}%` }}
-          ></div>
-        </div>
-      </div>
-      <div>
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-yellow-700 font-medium">Maybe</span>
-          <span>{statusCount.maybe}/{totalArticles}</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-yellow-500 h-2 rounded-full" 
-            style={{ width: `${(statusCount.maybe / totalArticles) * 100}%` }}
-          ></div>
-        </div>
-      </div>
-      <div>
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-red-700 font-medium">Excluded</span>
-          <span>{statusCount.exclude}/{totalArticles}</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-red-500 h-2 rounded-full" 
-            style={{ width: `${(statusCount.exclude / totalArticles) * 100}%` }}
-          ></div>
-        </div>
-      </div>
-      
-      {statusCount.conflicts > 0 && (
-        <div>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-orange-700 font-medium">Conflicts</span>
-            <span>{statusCount.conflicts}/{totalArticles}</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-orange-500 h-2 rounded-full" 
-              style={{ width: `${(statusCount.conflicts / totalArticles) * 100}%` }}
-            ></div>
-          </div>
-        </div>
-      )}
-      
-      <div>
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-700 font-medium">Unscreened</span>
-          <span>{statusCount.unscreened}/{totalArticles}</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-gray-500 h-2 rounded-full" 
-            style={{ width: `${(statusCount.unscreened / totalArticles) * 100}%` }}
-          ></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {/* Filters Section - Scrollable */}
-  <div className="flex-1 flex flex-col min-h-0">
-    <div className="p-6 flex-shrink-0">
-      <h3 className="font-bold text-lg text-black mb-4">Filters</h3>
-    </div>
-    
-    <div className="flex-1 overflow-y-auto px-6 pb-6">
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-semibold text-black mb-3">Publication Year</label>
-          <div className="px-2">
-            <input 
-              type="range" 
-              min="2000" 
-              max="2024" 
-              value={filters.yearRange[1]}
-              onChange={(e) => setFilters(prev => ({ ...prev, yearRange: [prev.yearRange[0], parseInt(e.target.value)] }))}
-              className="w-full accent-black"
-            />
-            <div className="flex justify-between text-xs text-gray-600 mt-1">
-              <span>2000</span>
-              <span className="font-medium">{filters.yearRange[1]}</span>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-500 p-8">
+            <div className="text-center">
+              <div className="text-4xl mb-4">📖</div>
+              <p className="text-lg">Select an article to view details</p>
             </div>
           </div>
-        </div>
+        )}
+      </div>
+    </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-black mb-3">Screening Status</label>
-          <div className="space-y-2">
-            {[
-              { value: 'all', label: 'All Articles' },
-              { value: 'include', label: 'Included' },
-              { value: 'exclude', label: 'Excluded' },
-              { value: 'maybe', label: 'Maybe' },
-              { value: 'unscreened', label: 'Unscreened' }
-            ].map(filter => (
-              <label key={filter.value} className="flex items-center text-sm text-gray-700 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="status"
-                  checked={filters.status === filter.value}
-                  onChange={() => setFilters(prev => ({ ...prev, status: filter.value }))}
-                  className="mr-3 text-black focus:ring-black"
-                />
-                <span className="font-medium">{filter.label}</span>
-              </label>
-            ))}
-          </div>
+    {/* RIGHT: Filters & Progress - Hidden on mobile when article is selected */}
+    <div className={`${selectedArticle !== null ? 'hidden lg:flex' : 'hidden lg:flex'} w-full lg:w-80 flex-col border-t lg:border-l border-gray-200 mt-16 lg:mt-0`}>
+      {/* Progress Section */}
+      <div className="p-4 lg:p-6 border-b border-gray-200 flex-shrink-0">
+        <h3 className="font-bold text-lg text-black mb-4">Screening Progress</h3>
+        <div className="space-y-4">
+          {[
+            { status: 'include', label: 'Included', color: 'green' },
+            { status: 'maybe', label: 'Maybe', color: 'yellow' },
+            { status: 'exclude', label: 'Excluded', color: 'red' },
+            ...(statusCount.conflicts > 0 ? [{ status: 'conflicts', label: 'Conflicts', color: 'orange' }] : []),
+            { status: 'unscreened', label: 'Unscreened', color: 'gray' }
+          ].map(({ status, label, color }) => (
+            <div key={status}>
+              <div className="flex justify-between text-sm mb-1">
+                <span className={`text-${color}-700 font-medium`}>{label}</span>
+                <span>{statusCount[status]}/{totalArticles}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className={`bg-${color}-500 h-2 rounded-full`}
+                  style={{ width: `${(statusCount[status] / totalArticles) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          ))}
         </div>
+      </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-black mb-3">Reviewer Count</label>
-          <div className="space-y-2">
-            {[
-              { value: 'all', label: 'All Articles' },
-              { value: 'single-reviewer', label: 'Only 1 Reviewer' },
-              { value: 'multiple-reviewers', label: '2+ Reviewers' },
-              { value: 'unscreened', label: 'Not Screened' }
-            ].map(filter => (
-              <label key={filter.value} className="flex items-center text-sm text-gray-700 cursor-pointer">
+      {/* Filters Section */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="p-4 lg:p-6 flex-shrink-0">
+          <h3 className="font-bold text-lg text-black mb-4">Filters</h3>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-black mb-3">Publication Year</label>
+              <div className="px-2">
                 <input 
-                  type="radio" 
-                  name="reviewerCount"
-                  checked={filters.reviewerCount === filter.value}
-                  onChange={() => setFilters(prev => ({ ...prev, reviewerCount: filter.value }))}
-                  className="mr-3 text-black focus:ring-black"
+                  type="range" 
+                  min="2000" 
+                  max="2024" 
+                  value={filters.yearRange[1]}
+                  onChange={(e) => setFilters(prev => ({ ...prev, yearRange: [prev.yearRange[0], parseInt(e.target.value)] }))}
+                  className="w-full accent-black"
                 />
-                <span className="font-medium">{filter.label}</span>
-              </label>
-            ))}
+                <div className="flex justify-between text-xs text-gray-600 mt-1">
+                  <span>2000</span>
+                  <span className="font-medium">{filters.yearRange[1]}</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-black mb-3">Screening Status</label>
+              <div className="space-y-2">
+                {[
+                  { value: 'all', label: 'All Articles' },
+                  { value: 'include', label: 'Included' },
+                  { value: 'exclude', label: 'Excluded' },
+                  { value: 'maybe', label: 'Maybe' },
+                  { value: 'unscreened', label: 'Unscreened' }
+                ].map(filter => (
+                  <label key={filter.value} className="flex items-center text-sm text-gray-700 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="status"
+                      checked={filters.status === filter.value}
+                      onChange={() => setFilters(prev => ({ ...prev, status: filter.value }))}
+                      className="mr-3 text-black focus:ring-black"
+                    />
+                    <span className="font-medium">{filter.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-black mb-3">Reviewer Count</label>
+              <div className="space-y-2">
+                {[
+                  { value: 'all', label: 'All Articles' },
+                  { value: 'single-reviewer', label: 'Only 1 Reviewer' },
+                  { value: 'multiple-reviewers', label: '2+ Reviewers' },
+                  { value: 'unscreened', label: 'Not Screened' }
+                ].map(filter => (
+                  <label key={filter.value} className="flex items-center text-sm text-gray-700 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="reviewerCount"
+                      checked={filters.reviewerCount === filter.value}
+                      onChange={() => setFilters(prev => ({ ...prev, reviewerCount: filter.value }))}
+                      className="mr-3 text-black focus:ring-black"
+                    />
+                    <span className="font-medium">{filter.label}</span>
+                  </label>
+                ))}
           </div>
         </div>
       </div>
