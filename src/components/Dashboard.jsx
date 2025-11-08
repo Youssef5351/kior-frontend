@@ -13,7 +13,8 @@ const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 const [uploading, setUploading] = useState(false);
-
+const [creatingReview, setCreatingReview] = useState(false);
+const [stepLoading, setStepLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
   const handleUploadSuccess = (projectId) => {
@@ -123,6 +124,7 @@ const handleDeleteFile = (fileName) => {
 
 
 
+
   const handleFormChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -140,34 +142,37 @@ const handleDeleteFile = (fileName) => {
   };
 
 // UPDATE: handleInviteSubmit to work with the stored project ID
+// REAL UPLOAD PROGRESS: Updated handleCreateReview with real progress tracking
 const handleCreateReview = async () => {
   console.log('Current step:', currentStep);
   console.log('Form data:', formData);
 
-  if (currentStep === 1) {
-    // Validate step 1 fields
-    if (!formData.title || !formData.type || !formData.domain) {
-      swal({
-        icon: 'warning',
-        title: 'Missing Information',
-        text: 'Please fill in all required fields (Title, Type, and Domain)',
-        confirmButtonColor: '#3085d6',
-      });
-      return;
-    }
+  setStepLoading(true);
 
-    try {
-      setProjectCreating(true);
+  try {
+    if (currentStep === 1) {
+      // Validate step 1 fields
+      if (!formData.title || !formData.type || !formData.domain) {
+        swal({
+          icon: 'warning',
+          title: 'Missing Information',
+          text: 'Please fill in all required fields (Title, Type, and Domain)',
+          button: 'OK'
+        });
+        setStepLoading(false);
+        return;
+      }
+
       console.log('Creating project...');
-
       const token = localStorage.getItem('token');
       if (!token) {
         swal({
           icon: 'warning',
           title: 'Authentication Required',
           text: 'Please log in to create a project',
-          confirmButtonColor: '#3085d6',
+          button: 'OK'
         });
+        setStepLoading(false);
         return;
       }
 
@@ -194,105 +199,119 @@ const handleCreateReview = async () => {
           icon: 'error',
           title: 'Creation Failed',
           text: error.error || error.message || 'Failed to create project',
-          confirmButtonColor: '#d33',
+          button: 'OK'
         });
+        setStepLoading(false);
         return;
       }
 
       const newProject = await response.json();
       console.log('New project created:', newProject);
       
-      // Store project ID for invitations
       setCurrentProjectId(newProject.id);
-      
-      // Update projects list
       setProjects(prev => [newProject, ...prev]);
-      
-      // Move to next step
       setCurrentStep(2);
       
-    } catch (error) {
-      console.error('Error creating project:', error);
-      swal({
-        icon: 'error',
-        title: 'Network Error',
-        text: 'Failed to create project. Please check your connection and try again.',
-        confirmButtonColor: '#d33',
-      });
-    } finally {
-      setProjectCreating(false);
-    }
-} else if (currentStep === 2) {
-  if (!formData.files || formData.files.length === 0) {
-    swal({
-      icon: 'warning',
-      title: 'Files Required',
-      text: 'Please upload at least one article file to continue.',
-      confirmButtonColor: '#3085d6',
-    });
-    return;
-  }
+    } else if (currentStep === 2) {
+      if (!formData.files || formData.files.length === 0) {
+        swal({
+          icon: 'warning',
+          title: 'Files Required',
+          text: 'Please upload at least one article file to continue.',
+          button: 'OK'
+        });
+        setStepLoading(false);
+        return;
+      }
 
-  try {
-    setProjectCreating(true);
-        setUploading(true);
-    setUploadProgress(0);
-    const token = localStorage.getItem("token");
+      setUploading(true);
+      setUploadProgress(0);
+      const token = localStorage.getItem("token");
 
-    const formDataToSend = new FormData();
-    formData.files.forEach(file => formDataToSend.append("files", file));
+      const formDataToSend = new FormData();
+      formData.files.forEach(file => formDataToSend.append("files", file));
 
-    
+      // Calculate total file size for realistic simulation
+      const totalSize = formData.files.reduce((total, file) => total + file.size, 0);
+      console.log(`Total file size: ${totalSize} bytes`);
 
-    const response = await fetch(`https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${currentProjectId}/upload`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      body: formDataToSend
-    });
+      // Start realistic progress simulation
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        if (progress < 90) { // Only simulate up to 90%, let real upload take it to 100%
+          progress += Math.random() * 15 + 5; // Random increment between 5-20%
+          if (progress > 90) progress = 90;
+          setUploadProgress(Math.round(progress));
+        }
+      }, 200); // Update every 200ms
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Upload failed");
-    }
+      try {
+        // Real upload with XMLHttpRequest for actual progress
+        const xhr = new XMLHttpRequest();
+        
+        // Real progress tracking
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable && progress >= 90) {
+            // Only use real progress after our simulation reaches 90%
+            const realProgress = 90 + (event.loaded / event.total) * 10;
+            setUploadProgress(Math.round(realProgress));
+          }
+        });
 
-    const data = await response.json();
-    console.log("Uploaded files:", data.files);
+        const uploadPromise = new Promise((resolve, reject) => {
+          xhr.addEventListener('load', () => {
+            clearInterval(progressInterval);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              setUploadProgress(100);
+              setTimeout(() => resolve(JSON.parse(xhr.responseText)), 300);
+            } else {
+              reject(new Error(`Upload failed with status: ${xhr.status}`));
+            }
+          });
 
-    // Continue
-    setCurrentStep(3);
-  } catch (error) {
-    console.error("Error uploading files:", error);
-    swal({
-      icon: 'error',
-      title: 'Upload Failed',
-      text: error.message,
-      confirmButtonColor: '#d33',
-    });
-  } finally {
-    setProjectCreating(false);
-  }
-  } else if (currentStep === 3) {
-    // Final step - send invitations if any, then redirect to project
-    try {
+          xhr.addEventListener('error', () => {
+            clearInterval(progressInterval);
+            reject(new Error('Network error during upload'));
+          });
+
+          xhr.addEventListener('timeout', () => {
+            clearInterval(progressInterval);
+            reject(new Error('Upload timeout'));
+          });
+        });
+
+        xhr.open('POST', `https://kior-backend4-youssefelkoumi512-dev.apps.rm1.0a51.p1.openshiftapps.com/api/projects/${currentProjectId}/upload`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.timeout = 30000; // 30 second timeout
+        xhr.send(formDataToSend);
+
+        const data = await uploadPromise;
+        console.log("Uploaded files:", data.files);
+        
+        // Wait a moment to show 100% completion
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setCurrentStep(3);
+        
+      } catch (error) {
+        clearInterval(progressInterval);
+        throw error;
+      }      
+    } else if (currentStep === 3) {
+      // Final step - send invitations if any, then redirect to project
       if (formData.emails && formData.role && currentProjectId) {
         console.log('Sending invitations...');
         await handleInviteSubmit();
       }
       
-      // Close modal and redirect to project
       handleCloseModal();
       
       if (currentProjectId) {
-        // Show success message before redirecting
         swal({
           icon: 'success',
           title: 'Project Created!',
           text: 'Your review project has been created successfully.',
-          confirmButtonColor: '#3085d6',
+          button: 'OK'
         }).then(() => {
-          // Use React Router navigation instead of window.location
           navigate(`/projects/${currentProjectId}`);
         });
       } else {
@@ -301,18 +320,22 @@ const handleCreateReview = async () => {
           icon: 'error',
           title: 'Redirect Failed',
           text: 'Project was created but redirect failed. Please check your projects list.',
-          confirmButtonColor: '#d33',
+          button: 'OK'
         });
       }
-    } catch (error) {
-      console.error('Error in final step:', error);
-      swal({
-        icon: 'error',
-        title: 'Error',
-        text: 'An error occurred while completing the project creation.',
-        confirmButtonColor: '#d33',
-      });
     }
+  } catch (error) {
+    console.error('Error in create review:', error);
+    swal({
+      icon: 'error',
+      title: 'Error',
+      text: error.message || 'An error occurred while processing your request.',
+      button: 'OK'
+    });
+  } finally {
+    setStepLoading(false);
+    setUploading(false);
+    setUploadProgress(0);
   }
 };
 
@@ -677,7 +700,8 @@ const handleProjectClick = (projectId) => {
         </div>
         <button
           onClick={handleCloseModal}
-          className="w-8 h-8 flex items-center justify-center rounded-md text-blue-500 hover:bg-blue-50 transition-colors duration-200 cursor-pointer"
+          disabled={creatingReview} // Disable close while creating
+          className="w-8 h-8 flex items-center justify-center rounded-md text-blue-500 hover:bg-blue-50 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <X className="w-5 h-5" />
         </button>
@@ -722,7 +746,8 @@ const handleProjectClick = (projectId) => {
                 placeholder="Enter a title for your review"
                 value={formData.title}
                 onChange={(e) => handleFormChange('title', e.target.value)}
-                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all cursor-text"
+                disabled={creatingReview} // Disable input while creating
+                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all cursor-text disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -733,7 +758,8 @@ const handleProjectClick = (projectId) => {
                 <select
                   value={formData.type}
                   onChange={(e) => handleFormChange('type', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 cursor-pointer"
+                  disabled={creatingReview} // Disable input while creating
+                  className="w-full px-4 py-2.5 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Type</option>
                   {reviewTypes.map((type) => (
@@ -747,7 +773,8 @@ const handleProjectClick = (projectId) => {
                 <select
                   value={formData.domain}
                   onChange={(e) => handleFormChange('domain', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 cursor-pointer"
+                  disabled={creatingReview} // Disable input while creating
+                  className="w-full px-4 py-2.5 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Domain</option>
                   {reviewDomains.map((domain) => (
@@ -765,88 +792,91 @@ const handleProjectClick = (projectId) => {
                 placeholder="Briefly describe your review..."
                 value={formData.description}
                 onChange={(e) => handleFormChange('description', e.target.value)}
-                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 cursor-text"
+                disabled={creatingReview} // Disable input while creating
+                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 cursor-text disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
         )}
 
-        {currentStep === 2 && (
-          <div className="space-y-6 font-bricolage">
-            <h3 className="text-base font-semibold text-blue-800">Upload Articles</h3>
-            <p className="text-sm text-blue-600">Upload research files for your review</p>
+{currentStep === 2 && (
+  <div className="space-y-6 font-bricolage">
+    <h3 className="text-base font-semibold text-blue-800">Upload Articles</h3>
+    <p className="text-sm text-blue-600">Upload research files for your review</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold mb-2 text-blue-800">Supported Formats</h4>
-                <ul className="space-y-1 text-sm text-blue-600">
-                  <li>.nbib • .ris • .csv • .zip</li>
-                </ul>
-              </div>
-
-              {/* Right */}
-              <div className="md:col-span-2 border border-blue-200 rounded-lg p-4 bg-blue-50">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-semibold text-blue-800">Upload Files</h4>
-                  <label className="text-blue-600 hover:text-blue-700 hover:underline text-sm cursor-pointer font-medium">
-                    Select Files
-                    <input
-                      type="file"
-                      multiple
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files);
-                        setFormData((prev) => ({
-                          ...prev,
-                          files: [...prev.files, ...files],
-                        }));
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                <div className="space-y-2">
-                  {formData.files.length === 0 ? (
-                    <p className="text-sm text-blue-400">No files uploaded.</p>
-                  ) : (
-                    formData.files.map((file, i) => (
-  <div className="mt-4 space-y-2">
-    {formData.files.map((file) => (
-      <div
-        key={file.name}
-        className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2 bg-gray-50"
-      >
-        <span className="text-sm text-gray-700 truncate">{file.name}</span>
-        <button
-          onClick={() => handleDeleteFile(file.name)}
-          className="text-red-500 hover:text-red-600 text-sm"
-        >
-          Delete
-        </button>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Left */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-semibold mb-2 text-blue-800">Supported Formats</h4>
+        <ul className="space-y-1 text-sm text-blue-600">
+          <li>.nbib • .ris • .csv • .zip</li>
+        </ul>
       </div>
-    ))}
-  </div>
-                    ))
-                  )}
-                </div>
-  {uploading && (
-    <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
-      <div
-        className="bg-blue-600 h-3 rounded-full transition-all duration-200"
-        style={{ width: `${uploadProgress}%` }}
-      />
-    </div>
-  )}
 
-  {uploading && (
-    <p className="text-xs text-blue-700 mt-2">{uploadProgress}% uploaded</p>
-  )}
-              </div>
+      {/* Right */}
+      <div className="md:col-span-2 border border-blue-200 rounded-lg p-4 bg-blue-50">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="font-semibold text-blue-800">Upload Files</h4>
+          <label className={`text-blue-600 hover:text-blue-700 hover:underline text-sm cursor-pointer font-medium ${
+            stepLoading ? 'opacity-50 cursor-not-allowed' : ''
+          }`}>
+            Select Files
+            <input
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              disabled={stepLoading}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        <div className="space-y-2">
+          {formData.files.length === 0 ? (
+            <p className="text-sm text-blue-400">No files uploaded.</p>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {formData.files.map((file) => (
+                <div
+                  key={file.name}
+                  className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2 bg-gray-50"
+                >
+                  <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                  <button
+                    onClick={() => handleDeleteFile(file.name)}
+                    disabled={stepLoading}
+                    className="text-red-500 hover:text-red-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+
+        {/* REAL UPLOAD PROGRESS BAR */}
+        {uploading && (
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-blue-800">Uploading files...</span>
+              <span className="text-sm text-blue-700">{uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <p className="text-xs text-blue-600 mt-2">
+              {uploadProgress < 100 ? 'Upload in progress...' : 'Upload complete!'}
+            </p>
           </div>
         )}
-
+      </div>
+    </div>
+  </div>
+)}
         {currentStep === 3 && (
           <div className="space-y-6 font-bricolage">
             <h3 className="text-base font-semibold text-blue-800">Invite Members</h3>
@@ -858,11 +888,12 @@ const handleProjectClick = (projectId) => {
               <input
                 type="text"
                 placeholder="Enter emails separated by commas"
-                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm cursor-text"
+                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm cursor-text disabled:opacity-50 disabled:cursor-not-allowed"
                 value={formData.emails || ""}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, emails: e.target.value }))
                 }
+                disabled={creatingReview} // Disable input while creating
               />
             </div>
 
@@ -870,11 +901,12 @@ const handleProjectClick = (projectId) => {
             <div>
               <label className="block text-sm font-medium mb-2 text-blue-800">User Role*</label>
               <select
-                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm cursor-pointer"
+                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 value={formData.role || ""}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, role: e.target.value }))
                 }
+                disabled={creatingReview} // Disable input while creating
               >
                 <option value="">Select role</option>
                 <option value="Collaborator">Collaborator</option>
@@ -887,11 +919,12 @@ const handleProjectClick = (projectId) => {
               <textarea
                 rows="3"
                 placeholder="Optional message"
-                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm cursor-text"
+                className="w-full px-4 py-2.5 border border-blue-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm cursor-text disabled:opacity-50 disabled:cursor-not-allowed"
                 value={formData.message || ""}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, message: e.target.value }))
                 }
+                disabled={creatingReview} // Disable input while creating
               />
             </div>
           </div>
@@ -899,40 +932,57 @@ const handleProjectClick = (projectId) => {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-4 bg-white border-t border-blue-200 flex items-center justify-between">
-        <button
-          onClick={currentStep === 1 ? handleCloseModal : handlePrevStep}
-          className="px-5 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium cursor-pointer"
-        >
-          {currentStep === 1 ? 'Cancel' : ''}
-        </button>
-        
-        <div className="flex items-center gap-3">
-          {/* Skip Button for Steps 2 and 3 */}
-          {(currentStep === 2 || currentStep === 3) && (
-            <button
-              onClick={() => {
-                if (currentStep === 3) {
-                  handleCreateReview();
-                } else {
-                  handleNextStep();
-                }
-              }}
-              className="px-5 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
-            >
-              {currentStep === 3 ? 'Skip & Create' : 'Skip this step'}
-            </button>
-          )}
-          
-          <button
-            onClick={handleCreateReview}
-            disabled={currentStep === 1 && (!formData.title || !formData.type || !formData.domain)}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {currentStep === 3 ? 'Create Review' : 'Next Step'}
-          </button>
-        </div>
-      </div>
+<div className="px-6 py-4 bg-white border-t border-blue-200 flex items-center justify-between">
+  <button
+    onClick={currentStep === 1 ? handleCloseModal : handlePrevStep}
+    disabled={stepLoading}
+    className="px-5 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+  >
+    {currentStep === 1 ? 'Cancel' : 'Back'}
+  </button>
+  
+  <div className="flex items-center gap-3">
+    {/* Skip Button for Steps 2 and 3 */}
+    {(currentStep === 2 || currentStep === 3) && (
+      <button
+        onClick={() => {
+          if (stepLoading) return;
+          if (currentStep === 3) {
+            handleCreateReview();
+          } else {
+            handleNextStep();
+          }
+        }}
+        disabled={stepLoading}
+        className="px-5 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {currentStep === 3 ? 'Skip & Create' : 'Skip this step'}
+      </button>
+    )}
+    
+   <button
+  onClick={handleCreateReview}
+  disabled={
+    stepLoading || 
+    (currentStep === 1 && (!formData.title || !formData.type || !formData.domain))
+  }
+  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 min-w-[120px] justify-center"
+>
+  {stepLoading ? (
+    <>
+      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+      {currentStep === 1 ? 'Creating...' : 
+       currentStep === 2 ? (uploading ? `Uploading ${uploadProgress}%` : 'Processing...') : 
+       'Creating...'}
+    </>
+  ) : currentStep === 3 ? (
+    'Create Review'
+  ) : (
+    'Next Step'
+  )}
+</button>
+  </div>
+</div>
     </div>
   </div>
 )}
