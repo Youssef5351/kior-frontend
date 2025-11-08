@@ -13,75 +13,76 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Footer from "./components/Footer";
 import TeamStatistics from './components/TeamStatistics';
 import Fulltext from './components/Full-text';
-
+import { useParams } from "react-router-dom";
 function App() {
+  const { id } = useParams();
   return (
     <Router>
       <Routes>
-        <Route 
-          path="/" 
-          element={
-            <>
-              <HeroPage />
-              <AppFeatures />
-              <WhyUs />
-              <Ending />
-              <Footer />
-            </>
-          } 
-        />
+            <Route path="/" element={
+      <>
+        <HeroPage />
+        <AppFeatures />
+        <WhyUs />
+        <Ending />
+        <Footer />
+      </>
+    } />
         <Route path="/register" element={<SignUp />} />
         <Route path="/login" element={<Login />} />
+
+
         
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/projects/:id" 
-          element={
-            <ProtectedRoute>
-              <ProjectOverview />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/projects/:id/screening" 
-          element={
-            <ProtectedRoute>
-              <ScreeningPage />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/projects/:id/duplicates" 
-          element={
-            <ProtectedRoute>
-              <DuplicateDetection />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/projects/:id/team-stats" 
-          element={
-            <ProtectedRoute>
-              <TeamStatistics />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/projects/:id/full-text" 
-          element={
-            <ProtectedRoute>
-              <Fulltext />
-            </ProtectedRoute>
-          } 
-        />
-      </Routes>
+      {/* Protected Routes */}
+    <Route 
+      path="/dashboard" 
+      element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:id" 
+      element={
+        <ProtectedRoute>
+          <ProjectOverview />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:id/screening" 
+      element={
+        <ProtectedRoute>
+          <ScreeningPage  projectId={id} />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:id/duplicates" 
+      element={
+        <ProtectedRoute>
+          <DuplicateDetection />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:id/team-stats" 
+      element={
+        <ProtectedRoute>
+          <TeamStatistics />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:id/full-text" 
+      element={
+        <ProtectedRoute>
+          <Fulltext />
+        </ProtectedRoute>
+      } 
+    />
+  </Routes>
     </Router>
   );
 }
